@@ -66,3 +66,5 @@ func get_accuracy() -> float:
 func complete_mission(mission_id: int) -> void:
 	if mission_id >= highest_unlocked:
 		highest_unlocked = mini(mission_id + 1, MissionRegistry.get_mission_count())
+	credits += 500
+	SaveManager.save()

@@ -1,10 +1,12 @@
 # src/autoloads/save_manager.gd
-class_name SaveManager
 extends Node
 
 const SAVE_PATH := "user://save.json"
 const TMP_PATH := "user://save.tmp"
 const SAVE_VERSION := 1
+
+func _ready() -> void:
+	load_into_game_state()
 
 func load_into_game_state() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):

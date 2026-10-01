@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 GameState="*res://src/autoloads/game_state.gd"
 SceneTransition="*res://src/autoloads/scene_transition.gd"
 AudioManager="*res://src/autoloads/audio_manager.gd"
+SaveManager="*res://src/autoloads/save_manager.gd"
 
 [display]
 
