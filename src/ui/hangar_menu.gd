@@ -16,6 +16,7 @@ var next_btn: Button
 var name_label: Label
 var credits_label: Label
 var ship_display: HangarShipDisplay
+var select_ship_button: Button
 var back_button: Button
 
 var stats_column: VBoxContainer
@@ -138,6 +139,14 @@ func _build_center_column() -> void:
 	ship_display.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	center_column.add_child(ship_display)
 
+	select_ship_button = Button.new()
+	select_ship_button.text = "SELECT SHIP"
+	select_ship_button.custom_minimum_size = Vector2(320, 60)
+	select_ship_button.add_theme_font_size_override("font_size", 20)
+	select_ship_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	select_ship_button.pressed.connect(_on_select_ship_pressed)
+	center_column.add_child(select_ship_button)
+
 	back_button = Button.new()
 	back_button.text = "BACK"
 	back_button.custom_minimum_size = Vector2(320, 60)
@@ -159,7 +168,7 @@ func _build_stats_column() -> void:
 	title.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
 	stats_column.add_child(title)
 
-	for stat_key in ["move_speed", "fire_cooldown", "special_damage", "max_hp"]:
+	for stat_key in ["move_speed", "fire_cooldown", "special_damage", "special_radius", "max_hp"]:
 		var row := HBoxContainer.new()
 		stats_column.add_child(row)
 		var label := Label.new()
@@ -178,6 +187,7 @@ func _stat_display_name(stat_key: String) -> String:
 		"move_speed": return "Speed"
 		"fire_cooldown": return "Fire Rate"
 		"special_damage": return "Special Dmg"
+		"special_radius": return "Special Radius"
 		"max_hp": return "Hull"
 		_: return stat_key
 
@@ -239,6 +249,9 @@ func _build_card(upgrade: UpgradeData, equipment: ShipEquipmentState) -> Control
 	elif is_owned:
 		action_btn.text = "EQUIP"
 		action_btn.disabled = false
+	elif not ShipLoadoutRegistry.is_unlocked(_current_loadout()):
+		action_btn.text = "SHIP LOCKED"
+		action_btn.disabled = true
 	elif not mission_unlocked:
 		action_btn.text = "NEED MISSION %d" % upgrade.required_mission_id
 		action_btn.disabled = true
@@ -264,6 +277,9 @@ func _try_equip(upgrade: UpgradeData) -> void:
 	var equipment := _current_equipment()
 	var already_owned := equipment.owned_upgrade_ids.has(upgrade.id)
 
+	if not already_owned and not ShipLoadoutRegistry.is_unlocked(_current_loadout()):
+		return
+
 	if not already_owned:
 		if GameState.credits < upgrade.cost:
 			return
@@ -285,10 +301,34 @@ func _try_equip(upgrade: UpgradeData) -> void:
 func _update_center() -> void:
 	var loadout := _current_loadout()
 	var unlocked := ShipLoadoutRegistry.is_unlocked(loadout)
-	name_label.text = loadout.display_name
+	if not unlocked:
+		name_label.text = "%s  (LOCKED - complete Mission %d)" % [loadout.display_name, loadout.unlock_mission_id - 1]
+		ship_display.modulate = Color(0.45, 0.45, 0.45)
+	else:
+		name_label.text = loadout.display_name
+		ship_display.modulate = Color.WHITE
 	credits_label.text = "CREDITS: %d" % GameState.credits
 	prev_btn.disabled = index <= 0
 	next_btn.disabled = index >= loadouts.size() - 1
+	_update_select_ship_button()
+
+func _update_select_ship_button() -> void:
+	var loadout := _current_loadout()
+	if GameState.selected_loadout_id == loadout.id:
+		select_ship_button.text = "ACTIVE"
+		select_ship_button.disabled = true
+	elif not ShipLoadoutRegistry.is_unlocked(loadout):
+		select_ship_button.text = "LOCKED"
+		select_ship_button.disabled = true
+	else:
+		select_ship_button.text = "SELECT SHIP"
+		select_ship_button.disabled = false
+
+func _on_select_ship_pressed() -> void:
+	AudioManager.play_menu_select()
+	GameState.selected_loadout_id = _current_loadout().id
+	SaveManager.save()
+	_update_select_ship_button()
 
 func _update_stats(animate: bool) -> void:
 	var loadout := _current_loadout()
@@ -337,7 +377,4 @@ func _on_next_pressed() -> void:
 
 func _on_back_pressed() -> void:
 	AudioManager.play_menu_select()
-	if ShipLoadoutRegistry.is_unlocked(_current_loadout()) and GameState.selected_loadout_id != _current_loadout().id:
-		GameState.selected_loadout_id = _current_loadout().id
-		SaveManager.save()
 	SceneTransition.change_scene("res://src/ui/main_menu.tscn")

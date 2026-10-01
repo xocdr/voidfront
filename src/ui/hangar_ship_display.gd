@@ -12,14 +12,16 @@ const CATEGORY_ATTACH_OFFSETS := {
 var _loadout: ShipLoadoutData
 var _equipment: ShipEquipmentState
 
-var _background: ParallaxBackground
+var _background: Control
+var _bg_drift_layers: Array[Node2D] = []
 var _ship_root: Node2D
 var _shadow_shape: Polygon2D
 var _base_shape: Polygon2D
 var _category_layers: Dictionary = {}
-var _engine_glow: Light2D
+var _engine_glow: PointLight2D
 var _particles: GPUParticles2D
 var _bob_tween: Tween
+var _bg_drift_tweens: Array[Tween] = []
 
 static func create(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> HangarShipDisplay:
 	var display := HangarShipDisplay.new()
@@ -30,6 +32,8 @@ static func create(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> H
 func _build_ui(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> void:
 	_loadout = loadout
 	_equipment = equipment
+
+	clip_contents = true
 
 	_build_background()
 
@@ -49,21 +53,22 @@ func _build_ui(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> void:
 	resized.connect(func(): _ship_root.position = size * 0.5)
 
 func _build_background() -> void:
-	_background = ParallaxBackground.new()
+	_background = Control.new()
+	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_background)
 	move_child(_background, 0)
 
-	var far := ParallaxLayer.new()
-	far.motion_scale = Vector2(0.1, 0.1)
+	var far := Node2D.new()
 	_background.add_child(far)
 	var far_bg := ColorRect.new()
 	far_bg.color = Color(0.05, 0.05, 0.1, 1.0)
 	far_bg.size = Vector2(1200, 1200)
 	far_bg.position = Vector2(-600, -600)
 	far.add_child(far_bg)
+	_bg_drift_layers.append(far)
 
-	var mid := ParallaxLayer.new()
-	mid.motion_scale = Vector2(0.3, 0.3)
+	var mid := Node2D.new()
 	_background.add_child(mid)
 	for i in range(4):
 		var pillar := ColorRect.new()
@@ -71,6 +76,36 @@ func _build_background() -> void:
 		pillar.size = Vector2(20, 400)
 		pillar.position = Vector2(-500 + i * 300, -200)
 		mid.add_child(pillar)
+	_bg_drift_layers.append(mid)
+
+	for layer in _bg_drift_layers:
+		layer.position = size * 0.5
+
+	resized.connect(_reposition_background_layers)
+	_start_background_drift()
+
+func _reposition_background_layers() -> void:
+	for layer in _bg_drift_layers:
+		layer.position = size * 0.5
+
+func _start_background_drift() -> void:
+	for tween in _bg_drift_tweens:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_bg_drift_tweens.clear()
+
+	# Slow, subtle automatic drift — a few pixels over several seconds, per layer,
+	# with distinct offsets/durations so the parallax feels alive without being busy.
+	var drift_specs := [Vector2(6.0, 3.0), Vector2(-4.0, 2.0)]
+	for i in _bg_drift_layers.size():
+		var layer := _bg_drift_layers[i]
+		var base_pos: Vector2 = layer.position
+		var drift: Vector2 = drift_specs[i % drift_specs.size()]
+		var duration := 5.0 + i * 1.5
+		var tween := create_tween().set_loops()
+		tween.tween_property(layer, "position", base_pos + drift, duration).set_trans(Tween.TRANS_SINE)
+		tween.tween_property(layer, "position", base_pos - drift, duration).set_trans(Tween.TRANS_SINE)
+		_bg_drift_tweens.append(tween)
 
 func _build_shadow() -> void:
 	_shadow_shape = Polygon2D.new()
@@ -143,6 +178,7 @@ func _build_idle_vfx() -> void:
 	_engine_glow = PointLight2D.new()
 	_engine_glow.color = Color(0.3, 0.7, 1.0)
 	_engine_glow.energy = 0.6
+	_engine_glow.texture = _make_radial_glow_texture()
 	_engine_glow.position = CATEGORY_ATTACH_OFFSETS["engine"] * 4.0
 	_ship_root.add_child(_engine_glow)
 
@@ -166,6 +202,20 @@ func _build_idle_vfx() -> void:
 	glow_tween.tween_property(_engine_glow, "energy", 1.0, 0.8).set_trans(Tween.TRANS_SINE)
 	glow_tween.tween_property(_engine_glow, "energy", 0.5, 0.8).set_trans(Tween.TRANS_SINE)
 
+func _make_radial_glow_texture() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1, 1, 1, 1))
+	gradient.set_color(1, Color(1, 1, 1, 0))
+
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.width = 128
+	tex.height = 128
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	return tex
+
 func play_equip_feedback(category: String) -> void:
 	if not _category_layers.has(category):
 		return
@@ -184,7 +234,8 @@ func play_equip_feedback(category: String) -> void:
 
 	var ring := Polygon2D.new()
 	ring.polygon = PackedVector2Array([Vector2(-10, -10), Vector2(10, -10), Vector2(10, 10), Vector2(-10, 10)])
-	ring.color = Color(1, 1, 1, 0.0)
+	ring.color = Color(1, 1, 1, 1)
+	ring.modulate.a = 0.0
 	ring.position = layer.position
 	_ship_root.add_child(ring)
 	var ring_tween := create_tween()
