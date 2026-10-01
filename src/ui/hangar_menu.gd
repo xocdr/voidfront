@@ -2,23 +2,30 @@ extends Control
 
 var loadouts: Array[ShipLoadoutData] = []
 var index: int = 0
+var selected_category: String = ""
 
-var center: VBoxContainer
-var selector_row: HBoxContainer
+var root_row: BoxContainer
+var nav_column: VBoxContainer
+var category_buttons: Dictionary = {}
+var card_list: VBoxContainer
+
+var center_column: VBoxContainer
+var ship_selector_row: HBoxContainer
 var prev_btn: Button
 var next_btn: Button
 var name_label: Label
-var preview_box: Control
-var preview_shape: Polygon2D
-var desc_label: Label
-var stats_container: VBoxContainer
-var lock_label: Label
-var equip_button: Button
+var credits_label: Label
+var ship_display: HangarShipDisplay
 var back_button: Button
+
+var stats_column: VBoxContainer
+var stats_rows: Dictionary = {}
+var _last_stats: Dictionary = {}
 
 func _ready() -> void:
 	loadouts = ShipLoadoutRegistry.get_all_loadouts()
 	index = _find_selected_index()
+	selected_category = UpgradeRegistry.get_categories()[0]
 	_create_ui()
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
@@ -29,198 +36,298 @@ func _find_selected_index() -> int:
 			return i
 	return 0
 
+func _current_loadout() -> ShipLoadoutData:
+	return loadouts[index]
+
+func _current_equipment() -> ShipEquipmentState:
+	return GameState.get_equipment_for(_current_loadout().id)
+
 func _create_ui() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color(0.03, 0.03, 0.08, 1.0)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	center = VBoxContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	center.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	center.grow_vertical = Control.GROW_DIRECTION_BOTH
-	center.custom_minimum_size = Vector2(400, 0)
-	center.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_theme_constant_override("separation", 12)
-	add_child(center)
+	root_row = BoxContainer.new()
+	root_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root_row.add_theme_constant_override("separation", 16)
+	add_child(root_row)
+
+	_build_nav_column()
+	_build_center_column()
+	_build_stats_column()
+
+	_update_all()
+
+func _build_nav_column() -> void:
+	nav_column = VBoxContainer.new()
+	nav_column.custom_minimum_size = Vector2(220, 0)
+	nav_column.add_theme_constant_override("separation", 8)
+	root_row.add_child(nav_column)
+
+	var title := Label.new()
+	title.text = "UPGRADES"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
+	nav_column.add_child(title)
+
+	for category in UpgradeRegistry.get_categories():
+		var btn := Button.new()
+		btn.text = category.to_upper()
+		btn.toggle_mode = true
+		btn.pressed.connect(_on_category_selected.bind(category))
+		nav_column.add_child(btn)
+		category_buttons[category] = btn
+
+	var card_scroll := ScrollContainer.new()
+	card_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	nav_column.add_child(card_scroll)
+
+	card_list = VBoxContainer.new()
+	card_list.add_theme_constant_override("separation", 6)
+	card_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_scroll.add_child(card_list)
+
+func _build_center_column() -> void:
+	center_column = VBoxContainer.new()
+	center_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_column.alignment = BoxContainer.ALIGNMENT_CENTER
+	center_column.add_theme_constant_override("separation", 8)
+	root_row.add_child(center_column)
 
 	var title_label := Label.new()
 	title_label.text = "HANGAR"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 40)
 	title_label.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
-	center.add_child(title_label)
+	center_column.add_child(title_label)
 
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 8)
-	center.add_child(spacer)
+	credits_label = Label.new()
+	credits_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	credits_label.add_theme_font_size_override("font_size", 18)
+	credits_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+	center_column.add_child(credits_label)
 
-	selector_row = HBoxContainer.new()
-	selector_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	selector_row.add_theme_constant_override("separation", 16)
-	center.add_child(selector_row)
+	ship_selector_row = HBoxContainer.new()
+	ship_selector_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	ship_selector_row.add_theme_constant_override("separation", 16)
+	center_column.add_child(ship_selector_row)
 
 	prev_btn = Button.new()
 	prev_btn.text = "◀"
 	prev_btn.custom_minimum_size = Vector2(56, 56)
 	prev_btn.pressed.connect(_on_prev_pressed)
-	selector_row.add_child(prev_btn)
+	ship_selector_row.add_child(prev_btn)
 
 	name_label = Label.new()
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.add_theme_font_size_override("font_size", 24)
 	name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	selector_row.add_child(name_label)
+	ship_selector_row.add_child(name_label)
 
 	next_btn = Button.new()
 	next_btn.text = "▶"
 	next_btn.custom_minimum_size = Vector2(56, 56)
 	next_btn.pressed.connect(_on_next_pressed)
-	selector_row.add_child(next_btn)
+	ship_selector_row.add_child(next_btn)
 
-	preview_box = Control.new()
-	preview_box.custom_minimum_size = Vector2(160, 160)
-	preview_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	center.add_child(preview_box)
+	ship_display = HangarShipDisplay.create(_current_loadout(), _current_equipment())
+	ship_display.custom_minimum_size = Vector2(480, 480)
+	ship_display.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	center_column.add_child(ship_display)
 
-	var preview_bg := ColorRect.new()
-	preview_bg.color = Color(0.08, 0.08, 0.16, 1.0)
-	preview_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	preview_box.add_child(preview_bg)
-
-	preview_shape = Polygon2D.new()
-	preview_shape.position = Vector2(80, 80)
-	preview_shape.scale = Vector2(4, 4)
-	preview_box.add_child(preview_shape)
-
-	desc_label = Label.new()
-	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	desc_label.add_theme_font_size_override("font_size", 14)
-	desc_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7))
-	center.add_child(desc_label)
-
-	var spacer2 := Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 4)
-	center.add_child(spacer2)
-
-	stats_container = VBoxContainer.new()
-	stats_container.add_theme_constant_override("separation", 2)
-	center.add_child(stats_container)
-
-	lock_label = Label.new()
-	lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lock_label.add_theme_font_size_override("font_size", 14)
-	lock_label.add_theme_color_override("font_color", Color(0.9, 0.3, 0.3))
-	center.add_child(lock_label)
-
-	var spacer3 := Control.new()
-	spacer3.custom_minimum_size = Vector2(0, 12)
-	center.add_child(spacer3)
-
-	equip_button = _make_button("EQUIP", center)
-	equip_button.pressed.connect(_on_equip_pressed)
-
-	back_button = _make_button("BACK", center)
+	back_button = Button.new()
+	back_button.text = "BACK"
+	back_button.custom_minimum_size = Vector2(320, 60)
+	back_button.add_theme_font_size_override("font_size", 20)
+	back_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back_button.pressed.connect(_on_back_pressed)
+	center_column.add_child(back_button)
 
-	_update_display()
+func _build_stats_column() -> void:
+	stats_column = VBoxContainer.new()
+	stats_column.custom_minimum_size = Vector2(220, 0)
+	stats_column.add_theme_constant_override("separation", 6)
+	root_row.add_child(stats_column)
+
+	var title := Label.new()
+	title.text = "SHIP STATS"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
+	stats_column.add_child(title)
+
+	for stat_key in ["move_speed", "fire_cooldown", "special_damage", "max_hp"]:
+		var row := HBoxContainer.new()
+		stats_column.add_child(row)
+		var label := Label.new()
+		label.text = _stat_display_name(stat_key) + ":"
+		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7))
+		row.add_child(label)
+		var value := Label.new()
+		value.add_theme_font_size_override("font_size", 14)
+		value.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		row.add_child(value)
+		stats_rows[stat_key] = value
+
+func _stat_display_name(stat_key: String) -> String:
+	match stat_key:
+		"move_speed": return "Speed"
+		"fire_cooldown": return "Fire Rate"
+		"special_damage": return "Special Dmg"
+		"max_hp": return "Hull"
+		_: return stat_key
 
 func _apply_responsive_layout() -> void:
 	var vp_w: float = get_viewport_rect().size.x
-	var margin: float = 40.0
-	var content_w: float = clampf(vp_w - margin, 160.0, 400.0)
-	center.custom_minimum_size.x = content_w
-
-	var btn_w: float = minf(320.0, content_w)
-	equip_button.custom_minimum_size.x = btn_w
-	back_button.custom_minimum_size.x = btn_w
-
-	var nav_btn_size: float = 40.0 if content_w < 220.0 else 56.0
-	prev_btn.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
-	next_btn.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
-
-	var label_w: float = maxf(80.0, content_w - nav_btn_size * 2.0 - 32.0)
-	name_label.custom_minimum_size.x = label_w
-
-func _update_display() -> void:
-	var loadout := loadouts[index]
-	var unlocked := ShipLoadoutRegistry.is_unlocked(loadout)
-	var equipped := loadout.id == GameState.selected_loadout_id
-
-	name_label.text = loadout.display_name
-	desc_label.text = loadout.description
-
-	preview_shape.polygon = loadout.polygon_points
-	preview_shape.color = loadout.color if unlocked else Color(0.4, 0.4, 0.4)
-
-	for child in stats_container.get_children():
-		child.queue_free()
-	_add_stat_row("Speed", "%d" % loadout.move_speed)
-	_add_stat_row("Fire Rate", "%.1f/s" % (1.0 / loadout.fire_cooldown))
-	_add_stat_row("Special Dmg", "%d" % loadout.special_damage)
-	_add_stat_row("Hull", "%d" % loadout.max_hp)
-
-	if unlocked:
-		lock_label.visible = false
-		equip_button.disabled = equipped
-		equip_button.text = "EQUIPPED" if equipped else "EQUIP"
+	if vp_w < 900.0:
+		root_row.vertical = true
 	else:
-		lock_label.visible = true
-		lock_label.text = "Unlocks after Mission %d" % (loadout.unlock_mission_id - 1)
-		equip_button.disabled = true
-		equip_button.text = "LOCKED"
+		root_row.vertical = false
 
+func _on_category_selected(category: String) -> void:
+	AudioManager.play_menu_select()
+	selected_category = category
+	_update_all()
+
+func _update_all() -> void:
+	_update_nav_buttons()
+	_update_cards()
+	_update_center()
+	_update_stats(false)
+
+func _update_nav_buttons() -> void:
+	for category in category_buttons:
+		category_buttons[category].button_pressed = (category == selected_category)
+
+func _update_cards() -> void:
+	for child in card_list.get_children():
+		child.queue_free()
+
+	var equipment := _current_equipment()
+	for upgrade in UpgradeRegistry.get_upgrades(selected_category):
+		card_list.add_child(_build_card(upgrade, equipment))
+
+func _build_card(upgrade: UpgradeData, equipment: ShipEquipmentState) -> Control:
+	var card := VBoxContainer.new()
+	card.add_theme_constant_override("separation", 2)
+
+	var name_lbl := Label.new()
+	name_lbl.text = upgrade.display_name
+	name_lbl.add_theme_font_size_override("font_size", 16)
+	card.add_child(name_lbl)
+
+	var desc_lbl := Label.new()
+	desc_lbl.text = upgrade.description
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.add_theme_font_size_override("font_size", 12)
+	desc_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7))
+	card.add_child(desc_lbl)
+
+	var is_equipped: bool = equipment.equipped.get(upgrade.category, "") == upgrade.id
+	var is_owned: bool = equipment.owned_upgrade_ids.has(upgrade.id)
+	var mission_unlocked: bool = GameState.highest_unlocked >= upgrade.required_mission_id
+	var can_afford: bool = GameState.credits >= upgrade.cost
+
+	var action_btn := Button.new()
+	if is_equipped:
+		action_btn.text = "EQUIPPED"
+		action_btn.disabled = true
+	elif is_owned:
+		action_btn.text = "EQUIP"
+		action_btn.disabled = false
+	elif not mission_unlocked:
+		action_btn.text = "NEED MISSION %d" % upgrade.required_mission_id
+		action_btn.disabled = true
+	elif not can_afford:
+		action_btn.text = "NOT ENOUGH CREDITS (%d)" % upgrade.cost
+		action_btn.disabled = true
+	else:
+		action_btn.text = "BUY (%d)" % upgrade.cost
+		action_btn.disabled = false
+
+	action_btn.pressed.connect(_try_equip.bind(upgrade))
+	card.add_child(action_btn)
+
+	return card
+
+func _try_equip(upgrade: UpgradeData) -> void:
+	if UpgradeRegistry.get_upgrade(upgrade.id) == null:
+		return
+
+	if GameState.highest_unlocked < upgrade.required_mission_id:
+		return
+
+	var equipment := _current_equipment()
+	var already_owned := equipment.owned_upgrade_ids.has(upgrade.id)
+
+	if not already_owned:
+		if GameState.credits < upgrade.cost:
+			return
+		GameState.credits -= upgrade.cost
+		equipment.owned_upgrade_ids.append(upgrade.id)
+
+	equipment.equipped[upgrade.category] = upgrade.id
+
+	AudioManager.play_menu_select()
+	ship_display.refresh_layer(upgrade.category, upgrade)
+	ship_display.play_equip_feedback(upgrade.category)
+
+	_update_cards()
+	_update_center()
+	_update_stats(true)
+
+	SaveManager.save()
+
+func _update_center() -> void:
+	var loadout := _current_loadout()
+	var unlocked := ShipLoadoutRegistry.is_unlocked(loadout)
+	name_label.text = loadout.display_name
+	credits_label.text = "CREDITS: %d" % GameState.credits
 	prev_btn.disabled = index <= 0
 	next_btn.disabled = index >= loadouts.size() - 1
 
-func _add_stat_row(label_text: String, value_text: String) -> void:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 8)
-	stats_container.add_child(row)
+func _update_stats(animate: bool) -> void:
+	var loadout := _current_loadout()
+	var equipment := _current_equipment()
+	var stats := ShipStats.get_effective_stats(loadout, equipment)
 
-	var label := Label.new()
-	label.text = "%s:" % label_text
-	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7))
-	row.add_child(label)
+	for stat_key in stats_rows:
+		var value_label: Label = stats_rows[stat_key]
+		var new_value: float = stats[stat_key]
+		var old_value: float = _last_stats.get(stat_key, new_value)
 
-	var value := Label.new()
-	value.text = value_text
-	value.add_theme_font_size_override("font_size", 14)
-	value.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-	row.add_child(value)
+		if animate and not is_equal_approx(old_value, new_value):
+			var tween := create_tween()
+			tween.tween_method(
+				func(v): value_label.text = _format_stat(stat_key, v),
+				old_value, new_value, 0.3
+			)
+		else:
+			value_label.text = _format_stat(stat_key, new_value)
 
-func _make_button(text: String, parent: Node) -> Button:
-	var btn := Button.new()
-	btn.text = text
-	btn.custom_minimum_size = Vector2(320, 60)
-	btn.add_theme_font_size_override("font_size", 20)
-	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	parent.add_child(btn)
-	return btn
+	_last_stats = stats.duplicate()
+
+func _format_stat(stat_key: String, value: float) -> String:
+	match stat_key:
+		"fire_cooldown": return "%.1f/s" % (1.0 / value)
+		_: return "%d" % roundi(value)
 
 func _on_prev_pressed() -> void:
 	AudioManager.play_menu_select()
 	index = maxi(0, index - 1)
-	_update_display()
+	ship_display.set_ship(_current_loadout(), _current_equipment())
+	_update_all()
 
 func _on_next_pressed() -> void:
 	AudioManager.play_menu_select()
 	index = mini(loadouts.size() - 1, index + 1)
-	_update_display()
-
-func _on_equip_pressed() -> void:
-	var loadout := loadouts[index]
-	if not ShipLoadoutRegistry.is_unlocked(loadout):
-		return
-	AudioManager.play_menu_select()
-	GameState.selected_loadout_id = loadout.id
-	_update_display()
+	ship_display.set_ship(_current_loadout(), _current_equipment())
+	_update_all()
 
 func _on_back_pressed() -> void:
 	AudioManager.play_menu_select()
+	if ShipLoadoutRegistry.is_unlocked(_current_loadout()) and GameState.selected_loadout_id != _current_loadout().id:
+		GameState.selected_loadout_id = _current_loadout().id
+		SaveManager.save()
 	SceneTransition.change_scene("res://src/ui/main_menu.tscn")
