@@ -1,0 +1,11 @@
+# Godot 4 editor cache/metadata
+.godot/
+
+# Exported builds
+export/
+
+# Godot-specific
+*.translation
+
+# Import caches (keep .import files, ignore generated import cache data)
+.import/
