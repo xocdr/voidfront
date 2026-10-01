@@ -21,6 +21,7 @@ var back_button: Button
 var stats_column: VBoxContainer
 var stats_rows: Dictionary = {}
 var _last_stats: Dictionary = {}
+var _stat_tweens: Dictionary = {}
 
 func _ready() -> void:
 	loadouts = ShipLoadoutRegistry.get_all_loadouts()
@@ -62,6 +63,7 @@ func _create_ui() -> void:
 func _build_nav_column() -> void:
 	nav_column = VBoxContainer.new()
 	nav_column.custom_minimum_size = Vector2(220, 0)
+	nav_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	nav_column.add_theme_constant_override("separation", 8)
 	root_row.add_child(nav_column)
 
@@ -147,6 +149,7 @@ func _build_center_column() -> void:
 func _build_stats_column() -> void:
 	stats_column = VBoxContainer.new()
 	stats_column.custom_minimum_size = Vector2(220, 0)
+	stats_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	stats_column.add_theme_constant_override("separation", 6)
 	root_row.add_child(stats_column)
 
@@ -297,12 +300,19 @@ func _update_stats(animate: bool) -> void:
 		var new_value: float = stats[stat_key]
 		var old_value: float = _last_stats.get(stat_key, new_value)
 
+		if _stat_tweens.has(stat_key):
+			var existing_tween: Tween = _stat_tweens[stat_key]
+			if existing_tween != null and existing_tween.is_valid():
+				existing_tween.kill()
+			_stat_tweens.erase(stat_key)
+
 		if animate and not is_equal_approx(old_value, new_value):
 			var tween := create_tween()
 			tween.tween_method(
 				func(v): value_label.text = _format_stat(stat_key, v),
 				old_value, new_value, 0.3
 			)
+			_stat_tweens[stat_key] = tween
 		else:
 			value_label.text = _format_stat(stat_key, new_value)
 
