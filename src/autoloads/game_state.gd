@@ -10,6 +10,8 @@ var is_mission_active: bool = false
 var current_mission_id: int = 1
 var highest_unlocked: int = 1
 var selected_loadout_id: String = "interceptor"
+var credits: int = 0
+var equipment: Dictionary = {}
 
 signal enemy_killed
 signal player_damaged(amount: float)
@@ -22,6 +24,29 @@ func reset_stats() -> void:
 	damage_taken = 0.0
 	mission_time = 0.0
 	is_mission_active = false
+
+func _default_state() -> Dictionary:
+	return {
+		"credits": 0,
+		"selected_loadout_id": "interceptor",
+		"highest_unlocked": 1,
+	}
+
+func _default_equipment_for(ship_id: String) -> ShipEquipmentState:
+	var state := ShipEquipmentState.new()
+	state.ship_id = ship_id
+	state.owned_upgrade_ids = []
+	state.equipped = {}
+	for category in UpgradeRegistry.get_categories():
+		var starter := UpgradeRegistry.get_starter_upgrade(category)
+		state.owned_upgrade_ids.append(starter.id)
+		state.equipped[category] = starter.id
+	return state
+
+func get_equipment_for(ship_id: String) -> ShipEquipmentState:
+	if not equipment.has(ship_id):
+		equipment[ship_id] = _default_equipment_for(ship_id)
+	return equipment[ship_id]
 
 func record_kill() -> void:
 	kills += 1
