@@ -31,15 +31,17 @@ func _ready() -> void:
 	add_child(trail)
 
 func apply_loadout(loadout: ShipLoadoutData) -> void:
-	move_speed = loadout.move_speed
-	fire_cooldown = loadout.fire_cooldown
-	special_cooldown_time = loadout.special_cooldown_time
-	special_radius = loadout.special_radius
-	special_damage = loadout.special_damage
+	var equipment := GameState.get_equipment_for(loadout.id)
+	var stats := ShipStats.get_effective_stats(loadout, equipment)
+	move_speed = stats.move_speed
+	fire_cooldown = stats.fire_cooldown
+	special_cooldown_time = stats.special_cooldown_time
+	special_radius = stats.special_radius
+	special_damage = stats.special_damage
 	base_color = loadout.color
 
 	var health_component: HealthComponent = get_node("HealthComponent")
-	health_component.max_hp = loadout.max_hp
+	health_component.max_hp = stats.max_hp
 
 	var ship_shape: Polygon2D = get_node("Shape")
 	ship_shape.polygon = loadout.polygon_points
