@@ -17,16 +17,27 @@ var projectile_scene: PackedScene = preload("res://src/projectiles/projectile.ts
 
 @onready var health: HealthComponent = $HealthComponent
 @onready var muzzle: Marker2D = $Muzzle
-@onready var shape: Polygon2D = $Shape
+
+# Built in code from ShipArt part lists (see src/player/ship_sprite.gd) rather
+# than being a Polygon2D in player.tscn, so the hull the player flies is the
+# exact same assembly the hangar previews.
+var sprite: ShipSprite
 
 signal fired_projectile(projectile: Node2D)
 signal used_special(pos: Vector2, radius: float)
 
 func _ready() -> void:
 	add_to_group("player")
+	# Fallback hull for a player dropped into a scene without apply_loadout().
+	# If apply_loadout() already ran (MissionRunner calls it before add_child),
+	# the sprite exists and this must not clobber it with the saved selection.
+	if not is_instance_valid(sprite):
+		var loadout := ShipLoadoutRegistry.get_loadout(GameState.selected_loadout_id)
+		_ensure_sprite(loadout)
+		_apply_muzzle_offset(loadout.id)
 	health.died.connect(_on_died)
 	health.damaged.connect(_on_damaged)
-	is_mobile = OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios") or DisplayServer.is_touchscreen_available()
+	is_mobile = TouchControls.is_mobile_device()
 	var trail := EngineTrail.create(Color(base_color.r, base_color.g, base_color.b, 0.7), 1.0)
 	add_child(trail)
 
@@ -43,9 +54,23 @@ func apply_loadout(loadout: ShipLoadoutData) -> void:
 	var health_component: HealthComponent = get_node("HealthComponent")
 	health_component.max_hp = stats.max_hp
 
-	var ship_shape: Polygon2D = get_node("Shape")
-	ship_shape.polygon = loadout.polygon_points
-	ship_shape.color = loadout.color
+	_ensure_sprite(loadout)
+	sprite.set_ship(loadout, equipment)
+	_apply_muzzle_offset(loadout.id)
+
+func _ensure_sprite(loadout: ShipLoadoutData) -> void:
+	if is_instance_valid(sprite):
+		return
+	sprite = ShipSprite.create(loadout)
+	add_child(sprite)
+	move_child(sprite, 0)
+
+# MissionRunner calls apply_loadout() *before* adding the player to the tree, so
+# @onready vars aren't resolved yet — reach these nodes via get_node(), the same
+# way the health component is fetched above.
+func _apply_muzzle_offset(ship_id: String) -> void:
+	var muzzle_node: Marker2D = get_node("Muzzle")
+	muzzle_node.position = ShipArt.get_muzzle_offset(ship_id)
 
 func _physics_process(_delta: float) -> void:
 	if not is_alive:
@@ -118,11 +143,12 @@ func _on_damaged(amount: float) -> void:
 	GameState.damage_taken += amount
 	GameState.player_damaged.emit(amount)
 	AudioManager.play_player_hurt()
-	shape.color = Color(1.0, 0.2, 0.2)
-	get_tree().create_timer(0.1).timeout.connect(func():
-		if is_instance_valid(shape):
-			shape.color = base_color
-	)
+	if is_instance_valid(sprite):
+		sprite.set_flash(Color(1.6, 0.5, 0.5))
+		get_tree().create_timer(0.1).timeout.connect(func():
+			if is_instance_valid(sprite):
+				sprite.clear_flash()
+		)
 
 func _on_died() -> void:
 	is_alive = false

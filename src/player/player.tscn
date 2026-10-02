@@ -11,10 +11,6 @@ collision_layer = 1
 collision_mask = 0
 script = ExtResource("1_player")
 
-[node name="Shape" type="Polygon2D" parent="."]
-color = Color(0.2, 0.8, 1, 1)
-polygon = PackedVector2Array(-12, -10, 16, 0, -12, 10)
-
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_1")
 
@@ -22,6 +18,7 @@ shape = SubResource("CircleShape2D_1")
 position = Vector2(20, 0)
 
 [node name="Camera2D" type="Camera2D" parent="."]
+process_callback = 0
 ignore_rotation = true
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0

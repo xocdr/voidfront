@@ -10,3 +10,4 @@ extends Resource
 @export var cost: int = 0
 @export var required_mission_id: int = 1
 @export var stat_modifiers: Dictionary = {}
+@export var shape_points: PackedVector2Array = PackedVector2Array()

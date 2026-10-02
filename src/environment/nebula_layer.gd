@@ -2,8 +2,16 @@ extends Node2D
 
 const PATCH_COUNT: int = 12
 const REGION_SIZE: float = 2048.0
+const BLOBS_PER_PATCH_MIN: int = 3
+const BLOBS_PER_PATCH_MAX: int = 4
 
-var patches: Array[Dictionary] = []
+var NebulaPatchScript: GDScript = preload("res://src/environment/nebula_patch.gd")
+
+var patch_nodes: Array[Node2D] = []
+var base_positions: PackedVector2Array
+var drift_speeds: PackedFloat32Array
+var drift_phases: PackedFloat32Array
+var time_elapsed: float = 0.0
 
 func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
@@ -15,41 +23,43 @@ func _ready() -> void:
 		Color(0.05, 0.2, 0.15, 0.05),
 		Color(0.1, 0.05, 0.3, 0.06),
 	]
+	var core_palette := [
+		Color(0.55, 0.3, 0.75, 0.16),
+		Color(0.3, 0.45, 0.85, 0.14),
+		Color(0.75, 0.3, 0.35, 0.15),
+		Color(0.3, 0.7, 0.55, 0.12),
+		Color(0.45, 0.3, 0.85, 0.14),
+	]
 	for i in range(PATCH_COUNT):
-		patches.append({
-			"pos": Vector2(rng.randf() * REGION_SIZE, rng.randf() * REGION_SIZE),
-			"radius": rng.randf_range(150.0, 450.0),
-			"color": palette[rng.randi() % palette.size()],
-			"layers": rng.randi_range(2, 4),
-		})
-	queue_redraw()
+		var palette_idx := rng.randi() % palette.size()
+		var center := Vector2(rng.randf() * REGION_SIZE, rng.randf() * REGION_SIZE)
+		var base_radius := rng.randf_range(150.0, 450.0)
+		var blobs: Array[Dictionary] = []
+		var blob_count := rng.randi_range(BLOBS_PER_PATCH_MIN, BLOBS_PER_PATCH_MAX)
+		for b in range(blob_count):
+			blobs.append({
+				"offset": Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * base_radius * 0.5,
+				"radius": base_radius * rng.randf_range(0.45, 0.85),
+				"layers": rng.randi_range(2, 3),
+			})
 
-func _draw() -> void:
-	for patch in patches:
-		var pos: Vector2 = patch.pos
-		var base_radius: float = patch.radius
-		var color: Color = patch.color
-		var layer_count: int = patch.layers
-		for l in range(layer_count, 0, -1):
-			var t := float(l) / float(layer_count)
-			var r := base_radius * t
-			var c := Color(color.r, color.g, color.b, color.a * t * 0.7)
-			_draw_soft_circle(pos, r, c)
+		var patch := Node2D.new()
+		patch.set_script(NebulaPatchScript)
+		patch.position = center
+		patch.blobs = blobs
+		patch.color = palette[palette_idx]
+		patch.core_color = core_palette[palette_idx]
+		patch.radius = base_radius
+		add_child(patch)
 
-func _draw_soft_circle(center: Vector2, radius: float, color: Color) -> void:
-	var segments := 24
-	var points := PackedVector2Array()
-	var colors := PackedColorArray()
-	for i in range(segments + 1):
-		var angle := i * TAU / float(segments)
-		points.append(center + Vector2(cos(angle), sin(angle)) * radius)
-		colors.append(Color(color.r, color.g, color.b, 0.0))
-	# Fan triangles from center
-	for i in range(segments):
-		var p0 := center
-		var p1 := points[i]
-		var p2 := points[i + 1]
-		draw_polygon(
-			PackedVector2Array([p0, p1, p2]),
-			PackedColorArray([color, colors[i], colors[i + 1]])
-		)
+		patch_nodes.append(patch)
+		base_positions.append(center)
+		drift_speeds.append(rng.randf_range(0.015, 0.04) * (1.0 if rng.randf() < 0.5 else -1.0))
+		drift_phases.append(rng.randf_range(0.0, TAU))
+
+func _process(delta: float) -> void:
+	time_elapsed += delta
+	# Cheap: only moves already-drawn patch nodes, never triggers a redraw.
+	for i in range(patch_nodes.size()):
+		var drift := sin(time_elapsed * drift_speeds[i] + drift_phases[i]) * 12.0
+		patch_nodes[i].position = base_positions[i] + Vector2(drift, drift * 0.6)

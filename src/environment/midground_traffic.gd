@@ -59,7 +59,7 @@ func _spawn_ship() -> void:
 	var body := _create_ship_shape(config)
 	ship.add_child(body)
 
-	# Dim engine glow
+	# Dim engine glow, tinted warmer/brighter than the hull for a glowing-thruster feel
 	var trail := CPUParticles2D.new()
 	trail.emitting = true
 	trail.amount = 6
@@ -72,9 +72,12 @@ func _spawn_ship() -> void:
 	trail.gravity = Vector2.ZERO
 	trail.scale_amount_min = 1.0 * config.size * 0.3
 	trail.scale_amount_max = 2.0 * config.size * 0.3
-	trail.color = Color(config.color.r + 0.2, config.color.g + 0.1, config.color.b + 0.3, 0.15)
+	trail.color = Color(minf(config.color.r + 0.4, 1.0), minf(config.color.g + 0.25, 1.0), minf(config.color.b + 0.5, 1.0), 0.22)
 	trail.position = Vector2(-config.size * 2, 0)
 	ship.add_child(trail)
+
+	if config.type == "cruiser":
+		_add_running_lights(ship, config)
 
 	ship.set_meta("speed", config.speed * randf_range(0.7, 1.3))
 	ship.set_meta("direction", direction)
@@ -100,6 +103,26 @@ func _create_ship_shape(config: Dictionary) -> Polygon2D:
 		])
 	poly.color = config.color
 	return poly
+
+func _add_running_lights(ship: Node2D, config: Dictionary) -> void:
+	var s: float = config.size
+	var light_offsets := [Vector2(-s * 1.6, -s * 0.5), Vector2(-s * 1.6, s * 0.5)]
+	var light_colors := [Color(1.0, 0.25, 0.2, 0.9), Color(0.2, 0.8, 1.0, 0.9)]
+	for i in range(light_offsets.size()):
+		var light := Polygon2D.new()
+		var r := maxf(s * 0.18, 0.5)
+		light.polygon = PackedVector2Array([
+			Vector2(-r, 0), Vector2(0, -r), Vector2(r, 0), Vector2(0, r),
+		])
+		light.position = light_offsets[i]
+		light.color = light_colors[i]
+		ship.add_child(light)
+
+		var tween := create_tween()
+		tween.set_loops()
+		tween.tween_interval(randf_range(0.6, 1.4))
+		tween.tween_property(light, "modulate:a", 0.15, 0.12)
+		tween.tween_property(light, "modulate:a", 1.0, 0.12)
 
 func _spawn_distant_bolt(source_ship: Node2D) -> void:
 	var bolt := Line2D.new()
