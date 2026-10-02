@@ -31,9 +31,8 @@ var is_running: bool = false
 var mission: MissionData
 
 func _ready() -> void:
-	# Menu music plays through the briefing and hyperspeed, then fades as the
-	# mission begins (covers Start Game, Missions, Next, Replay and Retry).
-	AudioManager.stop_music(0.6)
+	# Gameplay track loops for the whole mission and fades out when it ends.
+	AudioManager.play_gameplay_music()
 	mission = MissionRegistry.get_mission(GameState.current_mission_id)
 	if mission == null:
 		push_error("No mission data for id %d" % GameState.current_mission_id)
@@ -305,6 +304,7 @@ func _on_player_died() -> void:
 	if mission_ended:
 		return
 	mission_ended = true
+	AudioManager.stop_music(1.5)
 	is_running = false
 	enemy_spawner.active = false
 	crosshair.set_active(false)
@@ -317,6 +317,7 @@ func _on_mission_complete() -> void:
 	if mission_ended:
 		return
 	mission_ended = true
+	AudioManager.stop_music(1.5)
 	_refresh_hud()
 	is_running = false
 	enemy_spawner.active = false
@@ -346,6 +347,7 @@ func _on_mission_failed() -> void:
 	if mission_ended:
 		return
 	mission_ended = true
+	AudioManager.stop_music(1.5)
 	is_running = false
 	enemy_spawner.active = false
 	crosshair.set_active(false)
