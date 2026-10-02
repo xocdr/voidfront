@@ -31,6 +31,9 @@ var is_running: bool = false
 var mission: MissionData
 
 func _ready() -> void:
+	# Menu music plays through the briefing and hyperspeed, then fades as the
+	# mission begins (covers Start Game, Missions, Next, Replay and Retry).
+	AudioManager.stop_music(0.6)
 	mission = MissionRegistry.get_mission(GameState.current_mission_id)
 	if mission == null:
 		push_error("No mission data for id %d" % GameState.current_mission_id)

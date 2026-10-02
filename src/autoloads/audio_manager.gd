@@ -13,7 +13,19 @@ const SFX_POOL_SIZE: int = 8
 var sfx_players: Array[AudioStreamPlayer] = []
 var sfx_index: int = 0
 
+const MENU_MUSIC_VOLUME_DB: float = -10.0
+var menu_music: AudioStream = preload("res://src/bg_music/main_menu.mp3")
+var music_player: AudioStreamPlayer
+var _music_tween: Tween
+
 func _ready() -> void:
+	music_player = AudioStreamPlayer.new()
+	music_player.bus = "Master"
+	music_player.volume_db = MENU_MUSIC_VOLUME_DB
+	add_child(music_player)
+	if menu_music is AudioStreamMP3:
+		menu_music.loop = true
+
 	for i in range(SFX_POOL_SIZE):
 		var p := AudioStreamPlayer.new()
 		p.bus = "Master"
@@ -26,6 +38,29 @@ func _ready() -> void:
 	sfx_special = _generate_special()
 	sfx_player_hurt = _generate_player_hurt()
 	sfx_menu_select = _generate_menu_select()
+
+# Menu music loops until stop_music(). Safe to call from every menu screen: if
+# it is already playing it carries on instead of restarting from the top.
+func play_menu_music() -> void:
+	if _music_tween and _music_tween.is_valid():
+		_music_tween.kill()
+	music_player.volume_db = MENU_MUSIC_VOLUME_DB
+	if music_player.playing and music_player.stream == menu_music:
+		return
+	music_player.stream = menu_music
+	music_player.play()
+
+func stop_music(fade_time: float = 0.5) -> void:
+	if not music_player.playing:
+		return
+	if _music_tween and _music_tween.is_valid():
+		_music_tween.kill()
+	if fade_time <= 0.0:
+		music_player.stop()
+		return
+	_music_tween = create_tween()
+	_music_tween.tween_property(music_player, "volume_db", -60.0, fade_time)
+	_music_tween.tween_callback(music_player.stop)
 
 func play_laser() -> void:
 	_play(sfx_laser, -12.0)

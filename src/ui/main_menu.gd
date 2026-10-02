@@ -13,6 +13,7 @@ var top_spacer: Control
 
 func _ready() -> void:
 	_create_ui()
+	AudioManager.play_menu_music()
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
 

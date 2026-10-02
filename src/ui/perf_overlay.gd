@@ -90,7 +90,7 @@ func _process(delta: float) -> void:
 	_accum = 0.0
 	if not _fx_on:
 		_apply_fx()
-	label.text = "FPS %d  frame %.1f ms\nproc %.1f ms  phys %.1f ms\ndraws %d  objs %d\nnodes %d  enemies %d\nres %dx%d" % [
+	label.text = "FPS %d  frame %.1f ms\nproc %.1f ms  phys %.1f ms\ndraws %d  objs %d\nnodes %d  enemies %d\nres %dx%d  music %s" % [
 		Performance.get_monitor(Performance.TIME_FPS),
 		1000.0 / maxf(Performance.get_monitor(Performance.TIME_FPS), 1.0),
 		Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
@@ -100,4 +100,5 @@ func _process(delta: float) -> void:
 		Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 		get_tree().get_nodes_in_group("enemies").size(),
 		DisplayServer.window_get_size().x, DisplayServer.window_get_size().y,
+		"ON" if AudioManager.music_player.playing else "off",
 	]
