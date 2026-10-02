@@ -1,6 +1,8 @@
 extends Node
 
 @export var spawn_distance: float = 900.0
+# How far past the visible screen edge enemies appear.
+@export var spawn_margin: float = 200.0
 @export var max_enemies: int = 25
 
 var scout_scene: PackedScene = preload("res://src/enemies/scout.tscn")
@@ -101,10 +103,27 @@ func _spawn_enemy(wave: WaveData) -> void:
 	var angle := _get_spawn_angle(wave.direction_bias)
 	_spawn_at_angle(scene, angle)
 
+# World-space half size of what the player's camera currently shows.
+func _visible_half_extents() -> Vector2:
+	var vp_size := player.get_viewport().get_visible_rect().size
+	var camera: Camera2D = player.get_node_or_null("Camera2D")
+	var zoom := camera.zoom if camera else Vector2.ONE
+	return vp_size / zoom * 0.5
+
+# Distance along `dir` from the player to just past the visible screen edge, so
+# enemies appear off-screen on any aspect ratio or zoom instead of popping in.
+func _spawn_distance_for(dir: Vector2) -> float:
+	var half := _visible_half_extents()
+	var to_edge := minf(
+		half.x / maxf(absf(dir.x), 0.001),
+		half.y / maxf(absf(dir.y), 0.001))
+	return clampf(to_edge + spawn_margin, spawn_distance * 0.5, spawn_distance * 1.6)
+
 func _spawn_at_angle(scene: PackedScene, angle: float) -> void:
 	var enemy := scene.instantiate()
-	var offset := Vector2(cos(angle), sin(angle)) * spawn_distance
-	offset *= randf_range(0.85, 1.15)
+	var dir := Vector2(cos(angle), sin(angle))
+	var offset := dir * _spawn_distance_for(dir)
+	offset *= randf_range(0.95, 1.1)
 	enemy.global_position = player.global_position + offset
 	enemy.target = player
 	enemies_container.add_child(enemy)

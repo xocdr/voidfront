@@ -13,9 +13,10 @@ func _create_ui() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	center.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	center.grow_vertical = Control.GROW_DIRECTION_BOTH
-	center.custom_minimum_size = Vector2(400, 0)
+	center.custom_minimum_size = UiScale.vec(Vector2(400, 0))
 	center.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_theme_constant_override("separation", 16)
+	var compact: bool = get_viewport_rect().size.y < UiScale.px(700.0)
+	center.add_theme_constant_override("separation", roundi(UiScale.px(5.0 if compact else 16.0)))
 	add_child(center)
 
 	var mission := MissionRegistry.get_mission(GameState.current_mission_id)
@@ -25,7 +26,7 @@ func _create_ui() -> void:
 	_add_label(center, mission_name, 24, Color(0.8, 0.8, 0.8))
 
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 20)
+	spacer.custom_minimum_size = UiScale.vec(Vector2(0, 4 if compact else 20))
 	center.add_child(spacer)
 
 	var minutes := int(GameState.mission_time) / 60
@@ -37,7 +38,7 @@ func _create_ui() -> void:
 	_add_label(center, "Shots Fired: %d" % GameState.shots_fired, 20, Color(0.7, 0.7, 0.7))
 
 	var spacer2 := Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 24)
+	spacer2.custom_minimum_size = UiScale.vec(Vector2(0, 4 if compact else 24))
 	center.add_child(spacer2)
 
 	var next_id := GameState.current_mission_id + 1
@@ -66,15 +67,15 @@ func _add_label(parent: Node, text: String, size: int, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", UiScale.fs(size))
 	label.add_theme_color_override("font_color", color)
 	parent.add_child(label)
 
 func _make_button(text: String, parent: Node) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(300, 56)
-	btn.add_theme_font_size_override("font_size", 18)
+	btn.custom_minimum_size = UiScale.vec(Vector2(300, 56))
+	btn.add_theme_font_size_override("font_size", UiScale.fs(18))
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(btn)
 	return btn

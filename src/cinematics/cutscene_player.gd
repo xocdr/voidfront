@@ -35,6 +35,7 @@ func _build_ui() -> void:
 	bg = ColorRect.new()
 	bg.color = Color(0.02, 0.02, 0.06, 0.0)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	star_canvas = Control.new()
@@ -48,18 +49,18 @@ func _build_ui() -> void:
 	dialogue_container.anchor_right = 1.0
 	dialogue_container.anchor_top = 1.0
 	dialogue_container.anchor_bottom = 1.0
-	dialogue_container.offset_left = 16.0
-	dialogue_container.offset_right = -16.0
-	dialogue_container.offset_top = -150.0
-	dialogue_container.offset_bottom = -16.0
+	dialogue_container.offset_left = UiScale.px(16.0)
+	dialogue_container.offset_right = UiScale.px(-16.0)
+	dialogue_container.offset_top = UiScale.px(-150.0)
+	dialogue_container.offset_bottom = UiScale.px(-16.0)
 	dialogue_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dialogue_container)
 
 	# Portrait border
 	portrait_border = ColorRect.new()
 	portrait_border.color = Color(0.15, 0.5, 0.8, 0.6)
-	portrait_border.position = Vector2(0, 0)
-	portrait_border.size = Vector2(104, 104)
+	portrait_border.position = UiScale.vec(Vector2(0, 0))
+	portrait_border.size = UiScale.vec(Vector2(104, 104))
 	portrait_border.modulate.a = 0.0
 	portrait_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dialogue_container.add_child(portrait_border)
@@ -67,8 +68,8 @@ func _build_ui() -> void:
 	# Portrait panel
 	portrait_panel = ColorRect.new()
 	portrait_panel.color = Color(0.05, 0.08, 0.15, 1.0)
-	portrait_panel.position = Vector2(2, 2)
-	portrait_panel.size = Vector2(100, 100)
+	portrait_panel.position = UiScale.vec(Vector2(2, 2))
+	portrait_panel.size = UiScale.vec(Vector2(100, 100))
 	portrait_panel.modulate.a = 0.0
 	portrait_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dialogue_container.add_child(portrait_panel)
@@ -78,7 +79,7 @@ func _build_ui() -> void:
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	icon.add_theme_font_size_override("font_size", 36)
+	icon.add_theme_font_size_override("font_size", UiScale.fs(36))
 	icon.add_theme_color_override("font_color", Color(0.2, 0.6, 1.0, 0.7))
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	portrait_panel.add_child(icon)
@@ -90,7 +91,7 @@ func _build_ui() -> void:
 	text_bg_panel.anchor_right = 1.0
 	text_bg_panel.anchor_top = 0.0
 	text_bg_panel.anchor_bottom = 1.0
-	text_bg_panel.offset_left = 112.0
+	text_bg_panel.offset_left = UiScale.px(112.0)
 	text_bg_panel.offset_right = 0.0
 	text_bg_panel.offset_top = 0.0
 	text_bg_panel.offset_bottom = 0.0
@@ -101,8 +102,8 @@ func _build_ui() -> void:
 	# Speaker name
 	speaker_label = Label.new()
 	speaker_label.text = ""
-	speaker_label.position = Vector2(8, 6)
-	speaker_label.add_theme_font_size_override("font_size", 14)
+	speaker_label.position = UiScale.vec(Vector2(8, 6))
+	speaker_label.add_theme_font_size_override("font_size", UiScale.fs(14))
 	speaker_label.add_theme_color_override("font_color", Color(0.3, 0.7, 1.0))
 	speaker_label.modulate.a = 0.0
 	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -112,12 +113,12 @@ func _build_ui() -> void:
 	text_label = Label.new()
 	text_label.text = ""
 	text_label.anchor_right = 1.0
-	text_label.offset_left = 8.0
-	text_label.offset_top = 28.0
-	text_label.offset_right = -32.0
-	text_label.offset_bottom = -8.0
+	text_label.offset_left = UiScale.px(8.0)
+	text_label.offset_top = UiScale.px(28.0)
+	text_label.offset_right = UiScale.px(-32.0)
+	text_label.offset_bottom = UiScale.px(-8.0)
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_label.add_theme_font_size_override("font_size", 18)
+	text_label.add_theme_font_size_override("font_size", UiScale.fs(18))
 	text_label.add_theme_color_override("font_color", Color(0.85, 0.9, 0.95))
 	text_label.modulate.a = 0.0
 	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -128,9 +129,9 @@ func _build_ui() -> void:
 	continue_hint.text = "▼"
 	continue_hint.anchor_left = 1.0
 	continue_hint.anchor_top = 1.0
-	continue_hint.offset_left = -24.0
-	continue_hint.offset_top = -24.0
-	continue_hint.add_theme_font_size_override("font_size", 16)
+	continue_hint.offset_left = UiScale.px(-24.0)
+	continue_hint.offset_top = UiScale.px(-24.0)
+	continue_hint.add_theme_font_size_override("font_size", UiScale.fs(16))
 	continue_hint.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0, 0.6))
 	continue_hint.modulate.a = 0.0
 	continue_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -217,17 +218,21 @@ func _fade_out() -> void:
 		queue_free()
 	)
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not is_playing:
 		return
+	# On touch devices a tap arrives as both ScreenTouch and an emulated mouse
+	# click; only count the touch so one tap advances exactly one step.
 	if event is InputEventMouseButton and event.pressed:
-		_advance()
+		if not TouchControls.is_mobile_device():
+			_advance()
 	elif event is InputEventKey and event.pressed:
 		_advance()
 	elif event is InputEventScreenTouch and event.pressed:
 		_advance()
 
 func _advance() -> void:
+	get_viewport().set_input_as_handled()
 	if is_typing:
 		if type_tween and type_tween.is_valid():
 			type_tween.kill()

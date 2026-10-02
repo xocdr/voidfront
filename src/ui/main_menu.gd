@@ -8,6 +8,8 @@ var settings_button: Button
 var store_button: Button
 var quit_button: Button
 var center: VBoxContainer
+var subtitle_label: Label
+var top_spacer: Control
 
 func _ready() -> void:
 	_create_ui()
@@ -24,7 +26,7 @@ func _create_ui() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	center.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	center.grow_vertical = Control.GROW_DIRECTION_BOTH
-	center.custom_minimum_size = Vector2(400, 0)
+	center.custom_minimum_size = UiScale.vec(Vector2(400, 0))
 	center.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_theme_constant_override("separation", 16)
 	add_child(center)
@@ -32,18 +34,20 @@ func _create_ui() -> void:
 	title_label = Label.new()
 	title_label.text = "VOIDFRONT"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 64)
+	title_label.add_theme_font_size_override("font_size", UiScale.fs(64))
 	title_label.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
 	center.add_child(title_label)
 
-	var subtitle := Label.new()
+	subtitle_label = Label.new()
+	var subtitle := subtitle_label
 	subtitle.text = "Content Prototype"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 18)
+	subtitle.add_theme_font_size_override("font_size", UiScale.fs(18))
 	subtitle.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
 	center.add_child(subtitle)
 
-	var spacer := Control.new()
+	top_spacer = Control.new()
+	var spacer := top_spacer
 	spacer.custom_minimum_size = Vector2(0, 20)
 	center.add_child(spacer)
 
@@ -70,21 +74,28 @@ func _create_ui() -> void:
 func _apply_responsive_layout() -> void:
 	var vp_w: float = get_viewport_rect().size.x
 	var margin: float = 40.0
-	var content_w: float = clampf(vp_w - margin, 160.0, 400.0)
+	var content_w: float = clampf(vp_w - margin, 160.0, maxf(UiScale.px(400.0), 160.0))
 	center.custom_minimum_size.x = content_w
 
 	var narrow: bool = vp_w < 500.0
-	title_label.add_theme_font_size_override("font_size", 40 if narrow else 64)
+	# Short landscape screens (a phone, or a foldable's cover screen) can't fit the
+	# full stack at phone text size, so drop the subtitle and tighten the buttons.
+	var compact: bool = get_viewport_rect().size.y < UiScale.px(640.0)
+	title_label.add_theme_font_size_override("font_size", UiScale.fs(40 if (narrow or compact) else 64))
+	subtitle_label.visible = not compact
+	top_spacer.custom_minimum_size.y = UiScale.px(4.0 if compact else 20.0)
+	center.add_theme_constant_override("separation", roundi(UiScale.px(8.0 if compact else 16.0)))
 
-	var btn_w: float = minf(320.0, content_w)
+	var btn_w: float = minf(UiScale.px(320.0), content_w)
+	var btn_h: float = UiScale.px(46.0 if compact else 60.0)
 	for btn in [start_button, hangar_button, missions_button, settings_button, store_button, quit_button]:
-		btn.custom_minimum_size.x = btn_w
+		btn.custom_minimum_size = Vector2(btn_w, btn_h)
 
 func _make_button(text: String, parent: Node) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(320, 60)
-	btn.add_theme_font_size_override("font_size", 20)
+	btn.custom_minimum_size = UiScale.vec(Vector2(320, 60))
+	btn.add_theme_font_size_override("font_size", UiScale.fs(20))
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(btn)
 	return btn

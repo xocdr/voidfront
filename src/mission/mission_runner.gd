@@ -9,6 +9,8 @@ var TouchScript: GDScript = preload("res://src/ui/touch_controls.gd")
 var SpawnerScript: GDScript = preload("res://src/spawning/enemy_spawner.gd")
 var CutsceneScript: GDScript = preload("res://src/cinematics/cutscene_player.gd")
 var HyperspeedScript: GDScript = preload("res://src/cinematics/hyperspeed.gd")
+var PauseMenuScript: GDScript = preload("res://src/ui/pause_menu.gd")
+var CrosshairScript: GDScript = preload("res://src/ui/crosshair.gd")
 var transport_scene: PackedScene = preload("res://src/allies/transport.tscn")
 var meteor_scene: PackedScene = preload("res://src/enemies/meteor.tscn")
 
@@ -23,6 +25,8 @@ var objective_tracker: ObjectiveTracker
 var midground_traffic: Node2D
 var transport: Node2D
 var touch_controls: CanvasLayer
+var pause_menu: CanvasLayer
+var crosshair: Crosshair
 var is_running: bool = false
 var mission: MissionData
 
@@ -43,6 +47,8 @@ func _ready() -> void:
 	_setup_spawner()
 	_setup_objectives()
 	_setup_touch()
+	_setup_pause_menu()
+	_setup_crosshair()
 	_start_combat()
 
 func _setup_background() -> void:
@@ -111,6 +117,9 @@ func _setup_player() -> void:
 	player.apply_loadout(ShipLoadoutRegistry.get_loadout(GameState.selected_loadout_id))
 	player.global_position = Vector2.ZERO
 	player.arena_radius = mission.arena_radius
+	var camera: Camera2D = player.get_node_or_null("Camera2D")
+	if camera:
+		camera.zoom = Vector2.ONE * UiScale.world_zoom()
 	add_child(player)
 	player.fired_projectile.connect(_on_player_fired)
 	player.used_special.connect(_on_player_special)
@@ -118,6 +127,7 @@ func _setup_player() -> void:
 func _setup_hud() -> void:
 	hud = HudScript.new()
 	add_child(hud)
+	hud.pause_requested.connect(_on_pause_requested)
 
 func _setup_allies() -> void:
 	if mission.transport_waypoints.is_empty():
@@ -146,6 +156,36 @@ func _setup_midground() -> void:
 func _setup_touch() -> void:
 	touch_controls = TouchScript.new()
 	add_child(touch_controls)
+
+func _setup_pause_menu() -> void:
+	pause_menu = PauseMenuScript.new()
+	add_child(pause_menu)
+	pause_menu.resumed.connect(_on_pause_resumed)
+	pause_menu.main_menu_requested.connect(_on_pause_main_menu)
+
+func _setup_crosshair() -> void:
+	crosshair = CrosshairScript.new()
+	add_child(crosshair)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if mission_ended or pause_menu.visible:
+		return
+	if event.is_action_pressed("pause"):
+		get_viewport().set_input_as_handled()
+		pause_menu.open()
+		crosshair.set_active(false)
+
+func _on_pause_resumed() -> void:
+	crosshair.set_active(true)
+
+func _on_pause_main_menu() -> void:
+	SceneTransition.change_scene("res://src/ui/main_menu.tscn")
+
+func _on_pause_requested() -> void:
+	if mission_ended or pause_menu.visible:
+		return
+	pause_menu.open()
+	crosshair.set_active(false)
 
 func _setup_spawner() -> void:
 	enemy_spawner = SpawnerScript.new()
@@ -259,6 +299,7 @@ func _on_player_died() -> void:
 	mission_ended = true
 	is_running = false
 	enemy_spawner.active = false
+	crosshair.set_active(false)
 	hud.show_death_message()
 	get_tree().create_timer(2.5).timeout.connect(func():
 		SceneTransition.change_scene("res://src/ui/mission_failed.tscn")
@@ -270,6 +311,7 @@ func _on_mission_complete() -> void:
 	mission_ended = true
 	is_running = false
 	enemy_spawner.active = false
+	crosshair.set_active(false)
 	GameState.complete_mission(mission.id)
 	hud.show_mission_complete_banner()
 	get_tree().create_timer(2.0).timeout.connect(_start_completion_sequence)
@@ -297,6 +339,7 @@ func _on_mission_failed() -> void:
 	mission_ended = true
 	is_running = false
 	enemy_spawner.active = false
+	crosshair.set_active(false)
 	hud.show_death_message()
 	get_tree().create_timer(2.5).timeout.connect(func():
 		SceneTransition.change_scene("res://src/ui/mission_failed.tscn")

@@ -24,7 +24,7 @@ func _create_ui() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	center.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	center.grow_vertical = Control.GROW_DIRECTION_BOTH
-	center.custom_minimum_size = Vector2(400, 0)
+	center.custom_minimum_size = UiScale.vec(Vector2(400, 0))
 	center.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_theme_constant_override("separation", 16)
 	add_child(center)
@@ -32,7 +32,7 @@ func _create_ui() -> void:
 	var title_label := Label.new()
 	title_label.text = "MISSIONS"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 40)
+	title_label.add_theme_font_size_override("font_size", UiScale.fs(40))
 	title_label.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
 	center.add_child(title_label)
 
@@ -47,7 +47,7 @@ func _create_ui() -> void:
 
 	prev_btn = Button.new()
 	prev_btn.text = "◀"
-	prev_btn.custom_minimum_size = Vector2(56, 56)
+	prev_btn.custom_minimum_size = UiScale.vec(Vector2(56, 56))
 	prev_btn.pressed.connect(_on_prev_mission)
 	selector_row.add_child(prev_btn)
 
@@ -55,13 +55,13 @@ func _create_ui() -> void:
 	mission_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mission_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mission_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mission_label.add_theme_font_size_override("font_size", 24)
+	mission_label.add_theme_font_size_override("font_size", UiScale.fs(24))
 	mission_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 	selector_row.add_child(mission_label)
 
 	next_btn = Button.new()
 	next_btn.text = "▶"
-	next_btn.custom_minimum_size = Vector2(56, 56)
+	next_btn.custom_minimum_size = UiScale.vec(Vector2(56, 56))
 	next_btn.pressed.connect(_on_next_mission)
 	selector_row.add_child(next_btn)
 
@@ -85,14 +85,14 @@ func _create_ui() -> void:
 func _apply_responsive_layout() -> void:
 	var vp_w: float = get_viewport_rect().size.x
 	var margin: float = 40.0
-	var content_w: float = clampf(vp_w - margin, 160.0, 400.0)
+	var content_w: float = clampf(vp_w - margin, 160.0, maxf(UiScale.px(400.0), 160.0))
 	center.custom_minimum_size.x = content_w
 
-	var btn_w: float = minf(320.0, content_w)
+	var btn_w: float = minf(UiScale.px(320.0), content_w)
 	start_button.custom_minimum_size.x = btn_w
 	back_button.custom_minimum_size.x = btn_w
 
-	var nav_btn_size: float = 40.0 if content_w < 220.0 else 56.0
+	var nav_btn_size: float = 40.0 if content_w < 220.0 else UiScale.px(56.0)
 	prev_btn.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
 	next_btn.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
 
@@ -111,7 +111,7 @@ func _update_mission_display() -> void:
 			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			lbl.add_theme_font_size_override("font_size", 16)
+			lbl.add_theme_font_size_override("font_size", UiScale.fs(16))
 			lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 			obj_container.add_child(lbl)
 
@@ -138,8 +138,8 @@ func _on_next_mission() -> void:
 func _make_button(text: String, parent: Node) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(320, 60)
-	btn.add_theme_font_size_override("font_size", 20)
+	btn.custom_minimum_size = UiScale.vec(Vector2(320, 60))
+	btn.add_theme_font_size_override("font_size", UiScale.fs(20))
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(btn)
 	return btn

@@ -2,26 +2,20 @@
 class_name HangarShipDisplay
 extends Control
 
-const CATEGORY_ATTACH_OFFSETS := {
-	"weapons": Vector2(18, -4),
-	"engine": Vector2(-18, 0),
-	"shield": Vector2(0, 0),
-	"armor": Vector2(0, 8),
-}
-
 var _loadout: ShipLoadoutData
 var _equipment: ShipEquipmentState
 
 var _background: Control
 var _bg_drift_layers: Array[Node2D] = []
 var _ship_root: Node2D
-var _shadow_shape: Polygon2D
-var _base_shape: Polygon2D
-var _category_layers: Dictionary = {}
+var _shadow: Node2D
+var _sprite: ShipSprite
 var _engine_glow: PointLight2D
 var _particles: GPUParticles2D
 var _bob_tween: Tween
 var _bg_drift_tweens: Array[Tween] = []
+
+var _previewing_category: String = ""
 
 static func create(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> HangarShipDisplay:
 	var display := HangarShipDisplay.new()
@@ -46,11 +40,20 @@ func _build_ui(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> void:
 	_ship_root.position = size * 0.5
 
 	_build_shadow()
-	_build_base_ship()
-	_build_category_layers()
+	_build_ship()
 	_build_idle_vfx()
 
-	resized.connect(func(): _ship_root.position = size * 0.5)
+	resized.connect(_fit_ship_to_area)
+	_fit_ship_to_area()
+
+# The ship scales with the space it is given, so it fills a large panel on a
+# tablet without overflowing a short one on a phone.
+func _fit_ship_to_area() -> void:
+	if _ship_root == null:
+		return
+	_ship_root.position = size * 0.5
+	var fit := clampf(minf(size.x, size.y) / 320.0, 0.5, 2.0)
+	_ship_root.scale = Vector2(fit, fit)
 
 func _build_background() -> void:
 	_background = Control.new()
@@ -107,79 +110,74 @@ func _start_background_drift() -> void:
 		tween.tween_property(layer, "position", base_pos - drift, duration).set_trans(Tween.TRANS_SINE)
 		_bg_drift_tweens.append(tween)
 
+const SHIP_ZOOM := 3.8
+const SHIP_SKEW_DEG := 8.0
+
+# Flattened, blacked-out copy of the hull parts cast on the hangar deck below
+# the ship — same silhouette as the real hull, so it tracks any ship swap.
 func _build_shadow() -> void:
-	_shadow_shape = Polygon2D.new()
-	_shadow_shape.polygon = _loadout.polygon_points
-	_shadow_shape.color = Color(0, 0, 0, 0.35)
-	_shadow_shape.scale = Vector2(4.2, 1.2)
-	_shadow_shape.position = Vector2(0, 60)
-	_ship_root.add_child(_shadow_shape)
+	_shadow = Node2D.new()
+	_shadow.scale = Vector2(SHIP_ZOOM, SHIP_ZOOM * 0.3)
+	_shadow.position = Vector2(0, 70)
+	_shadow.modulate = Color(0, 0, 0, 0.35)
+	_ship_root.add_child(_shadow)
+	_rebuild_shadow()
 
-func _build_base_ship() -> void:
-	_base_shape = Polygon2D.new()
-	_base_shape.polygon = _loadout.polygon_points
-	_base_shape.color = _loadout.color
-	_base_shape.scale = Vector2(4.0, 4.0)
+func _rebuild_shadow() -> void:
+	for child in _shadow.get_children():
+		_shadow.remove_child(child)
+		child.queue_free()
+	ShipArt.build_parts(_shadow, ShipArt.get_hull_parts(_loadout.id), Color.BLACK)
+
+func _build_ship() -> void:
+	_sprite = ShipSprite.create(_loadout, _equipment, SHIP_ZOOM)
 	# Subtle fixed 3/4-perspective tilt via a light shear, not an aggressive distortion.
-	_base_shape.skew = deg_to_rad(8.0)
-	_ship_root.add_child(_base_shape)
-
-func _build_category_layers() -> void:
-	for category in UpgradeRegistry.get_categories():
-		var layer := Polygon2D.new()
-		layer.polygon = PackedVector2Array([Vector2(-6, -6), Vector2(6, -6), Vector2(6, 6), Vector2(-6, 6)])
-		layer.color = Color(1, 1, 1, 0.0)
-		layer.position = CATEGORY_ATTACH_OFFSETS.get(category, Vector2.ZERO) * 4.0
-		_ship_root.add_child(layer)
-		_category_layers[category] = layer
-
-		var upgrade_id: String = _equipment.equipped.get(category, "")
-		var upgrade := UpgradeRegistry.get_upgrade(upgrade_id) if not upgrade_id.is_empty() else null
-		if upgrade != null:
-			_apply_layer_visual(category, upgrade)
+	_sprite.skew = deg_to_rad(SHIP_SKEW_DEG)
+	_ship_root.add_child(_sprite)
 
 func refresh_layer(category: String, upgrade: UpgradeData) -> void:
-	if not _category_layers.has(category):
+	if _sprite == null:
 		return
-	_apply_layer_visual(category, upgrade)
+	_previewing_category = ""
+	_sprite.set_attachment(category, upgrade)
 
-func _apply_layer_visual(category: String, upgrade: UpgradeData) -> void:
-	var layer: Polygon2D = _category_layers[category]
-	# Placeholder visual: tier-0 items are invisible (no accent), higher tiers get a category-tinted accent.
-	# This is the seam where real per-upgrade art replaces the tint later without touching any other layer.
-	if upgrade.tier <= 0:
-		layer.color = Color(1, 1, 1, 0.0)
+# Unconfirmed previews render in amber rather than the real category tint, so
+# a "what would this look like" hover is visually distinct from owned hardware.
+const PREVIEW_TINT := Color(1.0, 0.8, 0.25)
+
+func preview_layer(category: String, upgrade: UpgradeData) -> void:
+	if _sprite == null:
 		return
-	match category:
-		"weapons":
-			layer.color = Color(1.0, 0.3, 0.2, 0.9)
-		"engine":
-			layer.color = Color(0.3, 0.7, 1.0, 0.9)
-		"shield":
-			layer.color = Color(0.3, 1.0, 0.8, 0.9)
-		"armor":
-			layer.color = Color(0.8, 0.8, 0.3, 0.9)
-		_:
-			layer.color = Color(1, 1, 1, 0.9)
+	_previewing_category = category
+	_sprite.set_attachment(category, upgrade, PREVIEW_TINT)
+
+func clear_preview(category: String) -> void:
+	if _previewing_category != category:
+		return
+	_previewing_category = ""
+	var upgrade_id: String = _equipment.equipped.get(category, "")
+	var upgrade := UpgradeRegistry.get_upgrade(upgrade_id) if not upgrade_id.is_empty() else null
+	_sprite.set_attachment(category, upgrade)
 
 func set_ship(loadout: ShipLoadoutData, equipment: ShipEquipmentState) -> void:
 	_loadout = loadout
 	_equipment = equipment
-	_base_shape.polygon = loadout.polygon_points
-	_base_shape.color = loadout.color
-	_shadow_shape.polygon = loadout.polygon_points
-	for category in UpgradeRegistry.get_categories():
-		var upgrade_id: String = equipment.equipped.get(category, "")
-		var upgrade := UpgradeRegistry.get_upgrade(upgrade_id) if not upgrade_id.is_empty() else null
-		if upgrade != null:
-			_apply_layer_visual(category, upgrade)
+	_previewing_category = ""
+	if _sprite == null:
+		# Called before the deferred _build_ui ran; it will pick up the new
+		# loadout/equipment when it builds.
+		return
+	_sprite.set_ship(loadout, equipment)
+	_rebuild_shadow()
+	if _engine_glow != null:
+		_engine_glow.position = (ShipArt.get_attach_offset(loadout.id, "engine") + Vector2(-8, 0)) * SHIP_ZOOM
 
 func _build_idle_vfx() -> void:
 	_engine_glow = PointLight2D.new()
 	_engine_glow.color = Color(0.3, 0.7, 1.0)
 	_engine_glow.energy = 0.6
 	_engine_glow.texture = _make_radial_glow_texture()
-	_engine_glow.position = CATEGORY_ATTACH_OFFSETS["engine"] * 4.0
+	_engine_glow.position = (ShipArt.get_attach_offset(_loadout.id, "engine") + Vector2(-8, 0)) * SHIP_ZOOM
 	_ship_root.add_child(_engine_glow)
 
 	_particles = GPUParticles2D.new()
@@ -217,26 +215,24 @@ func _make_radial_glow_texture() -> GradientTexture2D:
 	return tex
 
 func play_equip_feedback(category: String) -> void:
-	if not _category_layers.has(category):
-		return
-	var layer: Polygon2D = _category_layers[category]
+	var anchor := ShipArt.get_attach_offset(_loadout.id, category) * SHIP_ZOOM
 
 	var scan := ColorRect.new()
 	scan.color = Color(0.6, 0.9, 1.0, 0.5)
-	scan.size = Vector2(160, 4)
-	scan.position = layer.position + Vector2(-80, -100)
+	scan.size = Vector2(220, 4)
+	scan.position = anchor + Vector2(-110, -120)
 	_ship_root.add_child(scan)
 
 	var sweep := create_tween()
-	sweep.tween_property(scan, "position:y", layer.position.y + 100, 0.4).set_trans(Tween.TRANS_SINE)
+	sweep.tween_property(scan, "position:y", anchor.y + 120, 0.4).set_trans(Tween.TRANS_SINE)
 	sweep.tween_property(scan, "modulate:a", 0.0, 0.1)
 	sweep.tween_callback(scan.queue_free)
 
 	var ring := Polygon2D.new()
-	ring.polygon = PackedVector2Array([Vector2(-10, -10), Vector2(10, -10), Vector2(10, 10), Vector2(-10, 10)])
+	ring.polygon = ShipArt.arc_band(26, 32, 0.0, 359.0, 16)
 	ring.color = Color(1, 1, 1, 1)
 	ring.modulate.a = 0.0
-	ring.position = layer.position
+	ring.position = anchor
 	_ship_root.add_child(ring)
 	var ring_tween := create_tween()
 	ring_tween.tween_property(ring, "modulate:a", 0.8, 0.1)

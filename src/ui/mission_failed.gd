@@ -13,7 +13,7 @@ func _create_ui() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	center.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	center.grow_vertical = Control.GROW_DIRECTION_BOTH
-	center.custom_minimum_size = Vector2(400, 0)
+	center.custom_minimum_size = UiScale.vec(Vector2(400, 0))
 	center.alignment = BoxContainer.ALIGNMENT_CENTER
 	center.add_theme_constant_override("separation", 20)
 	add_child(center)
@@ -53,15 +53,15 @@ func _add_label(parent: Node, text: String, size: int, color: Color) -> void:
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", UiScale.fs(size))
 	label.add_theme_color_override("font_color", color)
 	parent.add_child(label)
 
 func _make_button(text: String, parent: Node) -> Button:
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(300, 56)
-	btn.add_theme_font_size_override("font_size", 18)
+	btn.custom_minimum_size = UiScale.vec(Vector2(300, 56))
+	btn.add_theme_font_size_override("font_size", UiScale.fs(18))
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(btn)
 	return btn
