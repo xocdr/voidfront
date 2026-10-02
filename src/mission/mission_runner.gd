@@ -44,6 +44,8 @@ func _ready() -> void:
 	_setup_obstacles()
 	_setup_midground()
 	_setup_hud()
+	if OS.is_debug_build():
+		add_child(PerfOverlay.create())
 	_setup_spawner()
 	_setup_objectives()
 	_setup_touch()
