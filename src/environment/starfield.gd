@@ -61,6 +61,7 @@ func _ready() -> void:
 	if shooting_stars_enabled:
 		shooting_star_timer = rng.randf_range(SHOOTING_STAR_MIN_INTERVAL, SHOOTING_STAR_MAX_INTERVAL)
 
+	_build_star_mesh()
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -105,8 +106,8 @@ func _spawn_shooting_star() -> void:
 	})
 
 func _draw() -> void:
-	for i in range(stars.size()):
-		_draw_star(stars[i], star_sizes[i], star_colors[i])
+	if _star_mesh:
+		draw_mesh(_star_mesh, null)
 
 	for t in range(twinkle_indices.size()):
 		var idx := twinkle_indices[t]
@@ -139,3 +140,32 @@ func _draw_shooting_star(s: Dictionary) -> void:
 # triangles per frame.
 func _draw_star(pos: Vector2, size: float, color: Color) -> void:
 	draw_rect(Rect2(pos.x - size, pos.y - size, size * 2.0, size * 2.0), color)
+
+# All stars in a layer as one mesh of quads built once. Individual draw_rect()
+# calls were still ~2,700 separate render objects per frame across the layers
+# and their mirrored parallax tiles; this makes it one per layer per tile.
+var _star_mesh: ArrayMesh
+
+func _build_star_mesh() -> void:
+	var verts := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	for i in range(stars.size()):
+		var p := stars[i]
+		var s := star_sizes[i]
+		var c := star_colors[i]
+		var base := verts.size()
+		verts.append(Vector2(p.x - s, p.y - s))
+		verts.append(Vector2(p.x + s, p.y - s))
+		verts.append(Vector2(p.x + s, p.y + s))
+		verts.append(Vector2(p.x - s, p.y + s))
+		for k in range(4):
+			colors.append(c)
+		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	_star_mesh = ArrayMesh.new()
+	_star_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)

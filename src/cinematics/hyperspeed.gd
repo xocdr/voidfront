@@ -16,9 +16,18 @@ var streak_intensity: float = 0.0
 var flash_alpha: float = 0.0
 var canvas: Control
 var flash_rect: ColorRect
+var space_rect: ColorRect
 
 func _ready() -> void:
 	layer = 95
+
+	# Opaque space backdrop that fades in with the wind-up, so the warp never
+	# plays over whatever screen launched it (e.g. the main menu).
+	space_rect = ColorRect.new()
+	space_rect.color = Color(0.02, 0.03, 0.09, 0.0)
+	space_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	space_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(space_rect)
 
 	canvas = Control.new()
 	canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -58,12 +67,14 @@ func _process(delta: float) -> void:
 	match phase:
 		1:
 			streak_intensity = (phase_timer / WIND_UP_TIME) * 0.3
+			space_rect.color.a = clampf(phase_timer / 0.3, 0.0, 1.0)
 			if phase_timer >= WIND_UP_TIME:
 				phase = 2
 				phase_timer = 0.0
 				AudioManager.play_special()
 		2:
 			streak_intensity = 0.3 + (phase_timer / STREAK_TIME) * 0.7
+			space_rect.color.a = 1.0
 			if phase_timer >= STREAK_TIME:
 				phase = 3
 				phase_timer = 0.0
@@ -71,6 +82,7 @@ func _process(delta: float) -> void:
 				transition_midpoint.emit()
 		3:
 			flash_alpha = 1.0 - phase_timer * 3.0
+			space_rect.color.a = 0.0
 			if flash_alpha <= 0.0:
 				flash_alpha = 0.0
 				phase = 4

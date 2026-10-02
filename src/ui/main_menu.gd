@@ -104,6 +104,8 @@ func _make_button(text: String, parent: Node) -> Button:
 func _on_start_pressed() -> void:
 	AudioManager.play_menu_select()
 	_set_buttons_disabled(true)
+	# Clear the menu so the briefing and warp play over plain space, not the menu.
+	center.visible = false
 
 	var mission := MissionRegistry.get_mission(GameState.current_mission_id)
 	if mission and not mission.briefing_text.is_empty():
