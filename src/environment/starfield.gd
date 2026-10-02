@@ -106,14 +106,14 @@ func _spawn_shooting_star() -> void:
 
 func _draw() -> void:
 	for i in range(stars.size()):
-		draw_circle(stars[i], star_sizes[i], star_colors[i])
+		_draw_star(stars[i], star_sizes[i], star_colors[i])
 
 	for t in range(twinkle_indices.size()):
 		var idx := twinkle_indices[t]
 		var color: Color = star_colors[idx]
 		var pulse := 0.65 + 0.35 * sin(twinkle_phases[t])
 		var twinkled := Color(color.r, color.g, color.b, clampf(color.a * pulse, 0.0, 1.0))
-		draw_circle(stars[idx], star_sizes[idx], twinkled)
+		_draw_star(stars[idx], star_sizes[idx], twinkled)
 
 	for idx in flare_indices:
 		_draw_flare(stars[idx], star_sizes[idx], star_colors[idx])
@@ -131,4 +131,11 @@ func _draw_shooting_star(s: Dictionary) -> void:
 	var fade: float = clampf(s.life / s.max_life, 0.0, 1.0)
 	var tail: Vector2 = s.vel.normalized() * -60.0
 	draw_line(s.pos, s.pos + tail, Color(1.0, 1.0, 0.95, fade * 0.8), 1.5)
-	draw_circle(s.pos, 1.6, Color(1.0, 1.0, 0.95, fade))
+	_draw_star(s.pos, 1.6, Color(1.0, 1.0, 0.95, fade))
+
+# Stars are at most a couple of pixels across, so a square reads the same as a
+# circle. draw_circle() builds a 64-sided fan per star, which across several
+# parallax layers and their mirrored tiles was hundreds of thousands of
+# triangles per frame.
+func _draw_star(pos: Vector2, size: float, color: Color) -> void:
+	draw_rect(Rect2(pos.x - size, pos.y - size, size * 2.0, size * 2.0), color)

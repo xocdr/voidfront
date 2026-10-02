@@ -240,7 +240,17 @@ func _process(delta: float) -> void:
 		return
 
 	GameState.mission_time += delta
+	_refresh_hud()
 
+	# Update wave display
+	if enemy_spawner and not mission.waves.is_empty():
+		var current_wave: int = mini(enemy_spawner.current_wave_index + 1, mission.waves.size())
+		hud.update_wave(current_wave, mission.waves.size())
+
+# Pushes the current stats and objective text to the HUD. Also called when the
+# mission ends: the final kill completes the objective before the next frame's
+# refresh, so without it the HUD freezes one short (e.g. 19/20).
+func _refresh_hud() -> void:
 	if player and is_instance_valid(player) and player.is_alive:
 		hud.update_display(
 			player.health.current_hp,
@@ -250,14 +260,7 @@ func _process(delta: float) -> void:
 			player.is_near_boundary(),
 			GameState.mission_time
 		)
-
-	# Update objective display
 	_update_objective_display()
-
-	# Update wave display
-	if enemy_spawner and not mission.waves.is_empty():
-		var current_wave: int = mini(enemy_spawner.current_wave_index + 1, mission.waves.size())
-		hud.update_wave(current_wave, mission.waves.size())
 
 func _update_objective_display() -> void:
 	var parts: PackedStringArray = []
@@ -311,6 +314,7 @@ func _on_mission_complete() -> void:
 	if mission_ended:
 		return
 	mission_ended = true
+	_refresh_hud()
 	is_running = false
 	enemy_spawner.active = false
 	crosshair.set_active(false)
