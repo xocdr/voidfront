@@ -433,21 +433,69 @@ static func _armor_parts(tier: int) -> Array[Dictionary]:
 # Builds a part list into Polygon2D children of `parent`. Outlined parts get a
 # dark expanded copy drawn first, which doubles as the panel gap between parts.
 static func build_parts(parent: Node2D, parts: Array[Dictionary], base: Color) -> void:
+	# A hull is dozens of small polygons; as separate Polygon2D nodes each one is
+	# its own canvas item. They are baked into one vertex-coloured mesh instead
+	# (index order keeps the back-to-front painting order). A part that can't be
+	# triangulated falls back to a Polygon2D, flushing the mesh first so the
+	# drawing order is unchanged.
+	var batch := _MeshBatch.new()
 	for part in parts:
 		var points: PackedVector2Array = part["points"]
 		if points.size() < 3:
 			continue
 		if part.get("outline", false):
-			var outline := Polygon2D.new()
-			outline.polygon = expand(points, part.get("outline_width", 1.6))
-			outline.color = resolve_tone("outline", base)
-			parent.add_child(outline)
-		var poly := Polygon2D.new()
-		poly.polygon = points
-		poly.color = resolve_tone(part.get("tone", "mid"), base)
+			var outline_pts := expand(points, part.get("outline_width", 1.6))
+			var outline_color := resolve_tone("outline", base)
+			if not batch.add(outline_pts, outline_color):
+				batch.flush(parent)
+				parent.add_child(_polygon(outline_pts, outline_color))
+		var color := resolve_tone(part.get("tone", "mid"), base)
 		if part.has("alpha"):
-			poly.color.a = part["alpha"]
-		parent.add_child(poly)
+			color.a = part["alpha"]
+		if not batch.add(points, color):
+			batch.flush(parent)
+			parent.add_child(_polygon(points, color))
+	batch.flush(parent)
+
+static func _polygon(points: PackedVector2Array, color: Color) -> Polygon2D:
+	var poly := Polygon2D.new()
+	poly.polygon = points
+	poly.color = color
+	return poly
+
+class _MeshBatch extends RefCounted:
+	var verts := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+
+	func add(points: PackedVector2Array, color: Color) -> bool:
+		var tris := Geometry2D.triangulate_polygon(points)
+		if tris.is_empty():
+			return false
+		var first := verts.size()
+		verts.append_array(points)
+		for i in range(points.size()):
+			colors.append(color)
+		for idx in tris:
+			indices.append(first + idx)
+		return true
+
+	func flush(parent: Node2D) -> void:
+		if indices.is_empty():
+			return
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		arrays[Mesh.ARRAY_COLOR] = colors
+		arrays[Mesh.ARRAY_INDEX] = indices
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var mi := MeshInstance2D.new()
+		mi.mesh = mesh
+		parent.add_child(mi)
+		verts = PackedVector2Array()
+		colors = PackedColorArray()
+		indices = PackedInt32Array()
 
 # Convenience for UI: a standalone Node2D holding one part list, used for the
 # upgrade-card icons in the hangar shop.

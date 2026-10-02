@@ -46,7 +46,7 @@ func move_toward_target() -> void:
 	var direction := to_target.normalized()
 	velocity = direction * move_speed
 	rotation = direction.angle()
-	move_and_slide()
+	_apply_velocity()
 
 	# Fire at target
 	fire_timer -= delta

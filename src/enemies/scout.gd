@@ -73,7 +73,7 @@ func move_toward_target() -> void:
 			var new_dir := current_dir.lerp(to_target, TURN_SPEED * get_physics_process_delta_time()).normalized()
 			velocity = new_dir * move_speed
 			rotation = new_dir.angle()
-			move_and_slide()
+			_apply_velocity()
 			return
 
 	if not fly_through:
@@ -96,4 +96,4 @@ func move_toward_target() -> void:
 			loop_timer = LOOP_BACK_TIME
 			move_speed /= 1.3
 
-	move_and_slide()
+	_apply_velocity()

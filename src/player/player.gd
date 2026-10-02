@@ -86,10 +86,11 @@ func _physics_process(_delta: float) -> void:
 		var overshoot := (dist - boundary_start) / (arena_radius * 0.15)
 		velocity += -global_position.normalized() * boundary_push_strength * clampf(overshoot, 0.0, 4.0)
 
-	move_and_slide()
+	# collision_mask is 0, so there is nothing to slide against; skip the query.
+	global_position += velocity * get_physics_process_delta_time()
 
 	if is_mobile:
-		_auto_aim()
+		_auto_aim(get_physics_process_delta_time())
 	else:
 		look_at(get_global_mouse_position())
 
@@ -124,19 +125,26 @@ func _use_special() -> void:
 	AudioManager.play_special()
 	get_tree().create_timer(special_cooldown_time).timeout.connect(func(): can_special = true)
 
-func _auto_aim() -> void:
-	var nearest: Node2D = null
-	var nearest_dist := 9999.0
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(enemy):
-			continue
-		var d := global_position.distance_to(enemy.global_position)
-		if d < nearest_dist:
-			nearest_dist = d
-			nearest = enemy
-	if nearest:
-		look_at(nearest.global_position)
-	elif velocity.length() > 10.0:
+# Re-scans for the nearest enemy a few times a second instead of every physics
+# tick; the aim still turns to face the cached target every frame.
+const AUTO_AIM_RESCAN: float = 0.1
+var _aim_timer: float = 0.0
+var _aim_target: Node2D = null
+
+func _auto_aim(delta: float) -> void:
+	_aim_timer -= delta
+	if _aim_timer <= 0.0 or _aim_target == null or not is_instance_valid(_aim_target):
+		_aim_timer = AUTO_AIM_RESCAN
+		_aim_target = null
+		var nearest_dist_sq := INF
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			var d: float = global_position.distance_squared_to(enemy.global_position)
+			if d < nearest_dist_sq:
+				nearest_dist_sq = d
+				_aim_target = enemy
+	if _aim_target:
+		look_at(_aim_target.global_position)
+	elif velocity.length_squared() > 100.0:
 		rotation = velocity.angle()
 
 func _on_damaged(amount: float) -> void:

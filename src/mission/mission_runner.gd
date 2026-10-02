@@ -2,7 +2,6 @@ extends Node2D
 
 var player_scene: PackedScene = preload("res://src/player/player.tscn")
 var StarfieldScript: GDScript = preload("res://src/environment/starfield.gd")
-var NebulaScript: GDScript = preload("res://src/environment/nebula_layer.gd")
 var TrafficScript: GDScript = preload("res://src/environment/midground_traffic.gd")
 var HudScript: GDScript = preload("res://src/ui/hud.gd")
 var TouchScript: GDScript = preload("res://src/ui/touch_controls.gd")
@@ -60,16 +59,7 @@ func _setup_background() -> void:
 	parallax_bg.name = "Background"
 	add_child(parallax_bg)
 
-	# Layer 1: Deep nebula (slowest parallax)
-	var nebula_layer := ParallaxLayer.new()
-	nebula_layer.motion_mirroring = Vector2(2048, 2048)
-	nebula_layer.motion_scale = Vector2(0.1, 0.1)
-	parallax_bg.add_child(nebula_layer)
-	var nebula := Node2D.new()
-	nebula.set_script(NebulaScript)
-	nebula_layer.add_child(nebula)
-
-	# Layer 2: Distant stars (slow)
+	# Layer 1: Distant stars (slow)
 	var star_layer := ParallaxLayer.new()
 	star_layer.motion_mirroring = Vector2(2048, 2048)
 	star_layer.motion_scale = Vector2(0.2, 0.2)
@@ -79,7 +69,7 @@ func _setup_background() -> void:
 	starfield.seed_value = 1
 	star_layer.add_child(starfield)
 
-	# Layer 3: Mid-range stars (medium)
+	# Layer 2: Mid-range stars (medium)
 	var star_layer2 := ParallaxLayer.new()
 	star_layer2.motion_mirroring = Vector2(2048, 2048)
 	star_layer2.motion_scale = Vector2(0.45, 0.45)
@@ -89,7 +79,7 @@ func _setup_background() -> void:
 	starfield2.seed_value = 2
 	star_layer2.add_child(starfield2)
 
-	# Layer 4: Near stars (faster, sparser, brighter)
+	# Layer 3: Near stars (faster, sparser, brighter)
 	var star_layer3 := ParallaxLayer.new()
 	star_layer3.motion_mirroring = Vector2(2048, 2048)
 	star_layer3.motion_scale = Vector2(0.7, 0.7)
@@ -237,11 +227,20 @@ func _play_arrival_effect() -> void:
 		is_running = true
 	)
 
+# The HUD only needs to refresh ~10 times a second; building its strings every
+# frame is wasted work.
+const HUD_REFRESH_INTERVAL: float = 0.1
+var _hud_timer: float = 0.0
+
 func _process(delta: float) -> void:
 	if not is_running:
 		return
 
 	GameState.mission_time += delta
+	_hud_timer -= delta
+	if _hud_timer > 0.0:
+		return
+	_hud_timer = HUD_REFRESH_INTERVAL
 	_refresh_hud()
 
 	# Update wave display

@@ -5,14 +5,17 @@ extends Area2D
 @export var lifetime: float = 2.5
 
 var direction: Vector2
+var _age: float = 0.0
 
 func _ready() -> void:
 	direction = Vector2.RIGHT.rotated(rotation)
 	body_entered.connect(_on_body_entered)
-	get_tree().create_timer(lifetime).timeout.connect(queue_free)
 
 func _physics_process(delta: float) -> void:
 	position += direction * speed * delta
+	_age += delta
+	if _age >= lifetime:
+		queue_free()
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("enemies"):

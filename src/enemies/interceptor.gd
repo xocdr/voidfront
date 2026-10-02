@@ -47,7 +47,7 @@ func move_toward_target() -> void:
 		velocity = to_orbit * move_speed * 0.8
 
 	rotation = to_target.angle()
-	move_and_slide()
+	_apply_velocity()
 
 	# Fire at player
 	fire_timer -= delta

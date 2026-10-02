@@ -6,7 +6,15 @@ var spawn_interval: float = 1.2
 var intensity: float = 1.0
 var ships: Array[Node2D] = []
 
-const MAX_SHIPS: int = 15
+const MAX_SHIPS: int = 8
+const CLEANUP_INTERVAL: float = 0.25
+
+# Ship with its velocity stored directly, instead of get_meta() lookups per frame.
+class TrafficShip extends Node2D:
+	var dir: Vector2 = Vector2.RIGHT
+	var spd: float = 0.0
+
+var _cleanup_timer: float = 0.0
 const SPAWN_DISTANCE: float = 1200.0
 const DESPAWN_DISTANCE: float = 1500.0
 
@@ -31,20 +39,23 @@ func _process(delta: float) -> void:
 		spawn_timer = spawn_interval * randf_range(0.6, 1.4)
 		_spawn_ship()
 
-	# Clean up distant ships
-	var to_remove: Array[int] = []
+	# Clean up distant ships (a few times a second is plenty)
+	_cleanup_timer -= delta
+	if _cleanup_timer > 0.0:
+		return
+	_cleanup_timer = CLEANUP_INTERVAL
+	var despawn_sq := DESPAWN_DISTANCE * DESPAWN_DISTANCE
 	for i in range(ships.size() - 1, -1, -1):
 		if not is_instance_valid(ships[i]):
 			ships.remove_at(i)
 			continue
-		var dist := ships[i].global_position.distance_to(player.global_position)
-		if dist > DESPAWN_DISTANCE:
+		if ships[i].global_position.distance_squared_to(player.global_position) > despawn_sq:
 			ships[i].queue_free()
 			ships.remove_at(i)
 
 func _spawn_ship() -> void:
 	var config: Dictionary = ship_configs[randi() % ship_configs.size()]
-	var ship := Node2D.new()
+	var ship := TrafficShip.new()
 
 	var angle := randf() * TAU
 	var start_pos := player.global_position + Vector2(cos(angle), sin(angle)) * SPAWN_DISTANCE
@@ -62,7 +73,7 @@ func _spawn_ship() -> void:
 	# Dim engine glow, tinted warmer/brighter than the hull for a glowing-thruster feel
 	var trail := CPUParticles2D.new()
 	trail.emitting = true
-	trail.amount = 6
+	trail.amount = 3
 	trail.lifetime = 0.3
 	trail.local_coords = false
 	trail.direction = Vector2(-1, 0)
@@ -79,8 +90,8 @@ func _spawn_ship() -> void:
 	if config.type == "cruiser":
 		_add_running_lights(ship, config)
 
-	ship.set_meta("speed", config.speed * randf_range(0.7, 1.3))
-	ship.set_meta("direction", direction)
+	ship.spd = config.speed * randf_range(0.7, 1.3)
+	ship.dir = direction
 
 	add_child(ship)
 	ships.append(ship)
@@ -142,6 +153,4 @@ func _spawn_distant_bolt(source_ship: Node2D) -> void:
 func _physics_process(delta: float) -> void:
 	for ship in ships:
 		if is_instance_valid(ship):
-			var dir: Vector2 = ship.get_meta("direction")
-			var spd: float = ship.get_meta("speed")
-			ship.position += dir * spd * delta
+			(ship as TrafficShip).position += (ship as TrafficShip).dir * (ship as TrafficShip).spd * delta

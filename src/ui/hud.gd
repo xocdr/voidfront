@@ -212,39 +212,72 @@ func _apply_layout() -> void:
 	warning_label.offset_top = top + (UiScale.px(140.0) if narrow else UiScale.px(44.0))
 	warning_label.offset_bottom = warning_label.offset_top + UiScale.px(40.0)
 
+# Last values pushed to the controls. Setting a Label's text/theme override or a
+# ColorRect's colour/size queues a redraw (and a re-layout) even when the value
+# is unchanged, so only touch a control when its value actually changed.
+var _last_hp: int = -1
+var _last_ratio: float = -1.0
+var _last_kills: int = -1
+var _last_special_ready: int = -1
+var _last_seconds: int = -1
+var _last_objective: String = ""
+var _objective_set: bool = false
+var _last_wave_current: int = -1
+var _last_wave_total: int = -1
+
 func update_display(hp: float, max_hp: float, kills: int, special_ready: bool, boundary: bool, elapsed: float) -> void:
 	var ratio := clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
-	health_bar_fill.size.x = bar_width * ratio
+	if not is_equal_approx(ratio, _last_ratio):
+		_last_ratio = ratio
+		health_bar_fill.size.x = bar_width * ratio
+		if ratio < 0.3:
+			health_bar_fill.color = Color(1.0, 0.25, 0.15)
+		elif ratio < 0.6:
+			health_bar_fill.color = Color(1.0, 0.7, 0.2)
+		else:
+			health_bar_fill.color = Color(0.2, 0.8, 1.0)
 
-	if ratio < 0.3:
-		health_bar_fill.color = Color(1.0, 0.25, 0.15)
-	elif ratio < 0.6:
-		health_bar_fill.color = Color(1.0, 0.7, 0.2)
-	else:
-		health_bar_fill.color = Color(0.2, 0.8, 1.0)
+	var hp_int := ceili(hp)
+	if hp_int != _last_hp:
+		_last_hp = hp_int
+		health_label.text = "%d" % hp_int
 
-	health_label.text = "%d" % ceili(hp)
-	kill_label.text = "KILLS: %d" % kills
+	if kills != _last_kills:
+		_last_kills = kills
+		kill_label.text = "KILLS: %d" % kills
 
-	if special_ready:
-		special_bar_fill.size.x = special_bar_width
-		special_bar_fill.color = Color(0.6, 0.9, 0.2)
-		special_label.add_theme_color_override("font_color", Color(0.6, 0.8, 0.3))
-	else:
-		special_bar_fill.size.x = 0
-		special_bar_fill.color = Color(0.3, 0.4, 0.2)
-		special_label.add_theme_color_override("font_color", Color(0.35, 0.35, 0.35))
+	var special_flag := 1 if special_ready else 0
+	if special_flag != _last_special_ready:
+		_last_special_ready = special_flag
+		if special_ready:
+			special_bar_fill.size.x = special_bar_width
+			special_bar_fill.color = Color(0.6, 0.9, 0.2)
+			special_label.add_theme_color_override("font_color", Color(0.6, 0.8, 0.3))
+		else:
+			special_bar_fill.size.x = 0
+			special_bar_fill.color = Color(0.3, 0.4, 0.2)
+			special_label.add_theme_color_override("font_color", Color(0.35, 0.35, 0.35))
 
-	warning_label.visible = boundary
+	if warning_label.visible != boundary:
+		warning_label.visible = boundary
 
-	var minutes := int(elapsed) / 60
-	var seconds := int(elapsed) % 60
-	time_label.text = "%d:%02d" % [minutes, seconds]
+	var total_seconds := int(elapsed)
+	if total_seconds != _last_seconds:
+		_last_seconds = total_seconds
+		time_label.text = "%d:%02d" % [total_seconds / 60, total_seconds % 60]
 
 func update_objective(text: String) -> void:
+	if _objective_set and text == _last_objective:
+		return
+	_objective_set = true
+	_last_objective = text
 	objective_label.text = text
 
 func update_wave(current: int, total: int) -> void:
+	if current == _last_wave_current and total == _last_wave_total:
+		return
+	_last_wave_current = current
+	_last_wave_total = total
 	if total > 0:
 		wave_label.text = "WAVE %d/%d" % [current, total]
 	else:

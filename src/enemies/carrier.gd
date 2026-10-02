@@ -49,7 +49,7 @@ func move_toward_target() -> void:
 		velocity = perp * DRIFT_SPEED
 
 	rotation = to_target.angle()
-	move_and_slide()
+	_apply_velocity()
 
 	# Spawn scouts
 	spawn_timer -= delta

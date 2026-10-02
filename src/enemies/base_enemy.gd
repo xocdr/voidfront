@@ -33,14 +33,19 @@ func _physics_process(_delta: float) -> void:
 		return
 	move_toward_target()
 	# Despawn when too far from target
-	if global_position.distance_to(target.global_position) > despawn_distance:
+	if global_position.distance_squared_to(target.global_position) > despawn_distance * despawn_distance:
 		queue_free()
 
 func move_toward_target() -> void:
 	var direction := (target.global_position - global_position).normalized()
 	velocity = direction * move_speed
 	rotation = direction.angle()
-	move_and_slide()
+	_apply_velocity()
+
+# Enemy bodies have collision_mask = 0 (they never get blocked by anything), so
+# move_and_slide()'s collision query is wasted work. Step the position directly.
+func _apply_velocity() -> void:
+	global_position += velocity * get_physics_process_delta_time()
 
 func _on_hit(_amount: float) -> void:
 	AudioManager.play_hit()

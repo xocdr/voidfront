@@ -8,7 +8,7 @@ static func create(color: Color = Color(0.3, 0.7, 1.0, 0.8), trail_scale: float 
 
 func _configure(color: Color, trail_scale: float) -> void:
 	emitting = true
-	amount = 16
+	amount = maxi(6, roundi(16.0 * trail_scale))
 	lifetime = 0.35 * trail_scale
 	local_coords = false
 	direction = Vector2(-1, 0)

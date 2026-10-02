@@ -227,10 +227,16 @@ func _release_all() -> void:
 	if is_instance_valid(overlay):
 		overlay.queue_redraw()
 
+var _last_special_ready: bool = true
+
 func _process(_delta: float) -> void:
-	# Cheap enough to redraw each frame; keeps the SPECIAL cooldown tint live.
+	# The overlay is otherwise redrawn only on touch/layout changes; the one thing
+	# that changes by itself is the SPECIAL cooldown tint, so redraw when that flips.
 	if overlay:
-		overlay.queue_redraw()
+		var ready_now := _special_ready()
+		if ready_now != _last_special_ready:
+			_last_special_ready = ready_now
+			overlay.queue_redraw()
 
 func _special_ready() -> bool:
 	if not is_instance_valid(_player):
